@@ -142,7 +142,6 @@
 </div>
 
 <script>
-// Многовариантные аппликатуры в строе B STANDARD (B E A D F# B)
 const chordTabsMulti = {
   "Bm": {
     standard: { frets: "0-2-2-0-0-0", shape: "Low B Root Bar" },
@@ -573,8 +572,6 @@ function updateVocalPreview(sectionId) {
   if (previewEl) previewEl.innerText = previewText || "Введите текст...";
 }
 
-// === УНИВЕРСАЛЬНЫЙ БАЙТОВЫЙ ДВИЖОК ДЛЯ DAW (STUDIO ONE, REAPER) ===
-
 function writeVarInt(val) {
   let buffer = [];
   let b;
@@ -593,17 +590,14 @@ function buildMIDIFileFromEvents(events) {
 
   let trackBytes = [];
   
-  // 1. Установка темпа BPM
   trackBytes.push(...writeVarInt(0), 0xFF, 0x51, 0x03, 
     (microsecondsPerBeat >> 16) & 0xFF, 
     (microsecondsPerBeat >> 8) & 0xFF, 
     microsecondsPerBeat & 0xFF
   );
 
-  // 2. Установка размера 4/4
   trackBytes.push(...writeVarInt(0), 0xFF, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08);
 
-  // 3. Запись нотных событий
   events.forEach(e => {
     trackBytes.push(...writeVarInt(e.deltaTime));
     if (e.type === 0xFF) { 
@@ -613,7 +607,6 @@ function buildMIDIFileFromEvents(events) {
     }
   });
 
-  // 4. Конец трека
   trackBytes.push(...writeVarInt(0), 0xFF, 0x2F, 0x00);
 
   let header = [0x4D, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x01, 0x00, 0x80];
@@ -768,12 +761,10 @@ function parseChordToMIDINotes(chordName) {
   let rootPitch = midiNoteMap[root] || 60;
   let intervals = chordIntervals[type] || [0, 4, 7];
 
-  // Психоакустический разнос нот (Drop Voicing):
-  // Басовый тон опускаем на 2 октавы, а расширения (7, 9, 11) поднимаем выше
   let bassNote = rootPitch - 24; 
   let chordNotes = intervals.map((interval, idx) => {
-    if (idx >= 3) return rootPitch + interval; // 9, 11, 13 поднимаются в верхний регистр
-    return rootPitch + interval - 12; // Основные тона в средний
+    if (idx >= 3) return rootPitch + interval; 
+    return rootPitch + interval - 12; 
   });
 
   return [bassNote, ...chordNotes];
