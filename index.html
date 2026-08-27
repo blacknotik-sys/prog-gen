@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Alt-Rock Chord, Voicings, Rhythm & Vocal MIDI Generator for Studio One Pro in B Standard">
-  <title>Alt-Rock Song, Wide Chords & Vocal MIDI Generator (B Standard)</title>
+  <title>Alt-Rock Song, Wide Chords & Web Audio Player (B Standard)</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎸</text></svg>">
   <style>
     :root {
@@ -35,7 +35,11 @@
     button { cursor: pointer; }
     button:hover { background: var(--accent); color: #fff; }
     .btn-main { background: var(--accent); color: #fff; font-weight: bold; }
+    .btn-play-all { background: var(--accent-pink); color: #fff; font-weight: bold; }
+    .btn-stop { background: #4a1c1c; color: #ff4757; border: 1px solid #ff4757; font-weight: bold; }
     .btn-midi-all { background: var(--accent-green); color: #fff; font-weight: bold; }
+    .btn-play-section { background: #2b2536; color: var(--accent-pink); border: 1px solid var(--accent-pink); font-weight: bold; padding: 6px 10px; font-size: 12px; }
+    .btn-play-section:hover { background: var(--accent-pink); color: #fff; }
     .btn-midi-section { background: #252836; color: var(--accent-green); border: 1px solid var(--accent-green); font-weight: bold; padding: 6px 10px; font-size: 12px; }
     .btn-midi-section:hover { background: var(--accent-green); color: #fff; }
     .btn-vocal { background: #1c2b36; color: var(--accent-cyan); border: 1px solid var(--accent-cyan); font-weight: bold; padding: 6px 10px; font-size: 12px; }
@@ -45,13 +49,17 @@
     .song-section { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); padding: 18px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px; transition: all 0.3s; }
     .song-section.disliked { opacity: 0.45; filter: grayscale(0.6); border-color: #4a2020; }
     .song-section.liked { border-color: var(--accent-green); box-shadow: 0 0 10px rgba(46, 213, 115, 0.15); }
+    .song-section.playing { border-color: var(--accent-pink); box-shadow: 0 0 15px rgba(224, 86, 253, 0.3); }
     .section-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
     .section-title { font-size: 18px; font-weight: bold; color: var(--accent); }
     .feedback-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); background: #1c1c28; cursor: pointer; }
     .feedback-btn.active-like { background: #1b472c; border-color: var(--accent-green); color: var(--accent-green); }
     .feedback-btn.active-dislike { background: #4a1c1c; border-color: var(--accent); color: var(--accent); }
     .progression-display { background: #121218; padding: 14px; border-radius: 8px; border: 1px solid #222230; }
-    .chords { font-size: 22px; font-weight: bold; letter-spacing: 1px; color: #fff; margin-bottom: 6px; }
+    .chords { font-size: 22px; font-weight: bold; letter-spacing: 1px; color: #fff; margin-bottom: 6px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .chord-badge { background: #1c1c28; padding: 2px 8px; border-radius: 6px; border: 1px solid #2e2e42; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-chord-listen { background: none; border: none; padding: 0; color: var(--accent-gold); font-size: 14px; cursor: pointer; }
+    .btn-chord-listen:hover { color: #fff; background: none; }
     .mood-box { font-size: 13px; color: var(--accent-gold); font-style: italic; margin-bottom: 8px; }
     .numerals { font-size: 13px; color: var(--text-dim); }
     .lyrics-box { background: #151620; border: 1px solid #2b2d40; border-radius: 8px; padding: 10px 14px; }
@@ -85,8 +93,8 @@
 <body>
 
 <div class="container">
-  <h1>🎸 Alt-Rock & Wide Voicings Engine <span class="tuning-badge">B STANDARD</span></h1>
-  <div class="subtitle">B Standard • Smart Extensions • Psychoacoustics • Paramore / Muse / Dead Pony Style</div>
+  <h1>🎸 Alt-Rock & Audio Synth Engine <span class="tuning-badge">B STANDARD</span></h1>
+  <div class="subtitle">B Standard • Web Audio Synth • Vocal Player • Paramore / Muse / Dead Pony Style</div>
 
   <div class="controls-top">
     <div class="ctrl-group">
@@ -113,7 +121,7 @@
       <label for="voicing-style"><b>Стиль аппликатур B:</b> </label>
       <select id="voicing-style" onchange="updateAll()">
         <option value="standard" selected>Standard Shapes</option>
-        <option value="open">Open Strings (Атмосферные открытые)</option>
+        <option value="open">Open Strings (Атмосферные)</option>
         <option value="drop">Wide Spread (Разреженные Drop-2/3)</option>
         <option value="tight">Tight Low-Barres (Плотные)</option>
       </select>
@@ -121,12 +129,13 @@
 
     <label class="toggle-container">
       <input type="checkbox" id="smart-ext-toggle" checked onchange="updateAll()">
-      🧠 Smart Trends & Wide Voicings (maj9, m11, 7sus4)
+      🧠 Smart Trends & Wide Voicings
     </label>
 
     <div style="display: flex; gap: 8px;">
-      <button class="btn-main" onclick="generateFullSong()">🎲 Сгенерировать весь трек</button>
-      <button class="btn-midi-all" onclick="downloadFullSongMIDI()">🎼 Скачать MIDI трека</button>
+      <button class="btn-main" onclick="generateFullSong()">🎲 Сгенерировать</button>
+      <button class="btn-play-all" id="btn-play-song" onclick="togglePlayFullSong()">▶️ Слушать трек</button>
+      <button class="btn-midi-all" onclick="downloadFullSongMIDI()">🎼 Скачать MIDI</button>
     </div>
   </div>
 
@@ -143,156 +152,31 @@
 
 <script>
 const chordTabsMulti = {
-  "Bm": {
-    standard: { frets: "0-2-2-0-0-0", shape: "Low B Root Bar" },
-    open:     { frets: "0-9-9-7-0-0", shape: "Open B/F# Drones" },
-    drop:     { frets: "0-x-9-7-7-x", shape: "Spread Drop-2" },
-    tight:    { frets: "0-2-4-4-3-0", shape: "Tight Low Power" }
-  },
-  "Bm7": {
-    standard: { frets: "0-2-0-0-0-0", shape: "Low B7" },
-    open:     { frets: "0-9-7-7-0-0", shape: "Open Bm7 Drones" },
-    drop:     { frets: "0-x-7-7-7-7", shape: "Spread Minor 7th" },
-    tight:    { frets: "0-2-0-2-3-0", shape: "Compact m7" }
-  },
-  "Bm9": {
-    standard: { frets: "0-2-0-2-2-0", shape: "Bm9 Standard" },
-    open:     { frets: "0-9-0-7-0-0", shape: "Wide Open Bm9" },
-    drop:     { frets: "0-x-7-6-7-x", shape: "Spread Bm9" },
-    tight:    { frets: "x-2-0-2-2-2", shape: "High-register m9" }
-  },
-  "Bm11": {
-    standard: { frets: "0-0-0-0-0-0", shape: "All-Open Drone Bm11" },
-    open:     { frets: "0-9-9-7-0-0", shape: "Shoegaze Open m11" },
-    drop:     { frets: "0-x-7-7-5-0", shape: "Wide Spread m11" },
-    tight:    { frets: "0-2-2-2-3-0", shape: "Low m11" }
-  },
-  "B": {
-    standard: { frets: "0-2-2-1-0-0", shape: "B Major Low" },
-    open:     { frets: "0-9-9-8-0-0", shape: "Open B Major" },
-    drop:     { frets: "0-x-9-8-7-x", shape: "Spread Major" },
-    tight:    { frets: "0-2-4-4-4-x", shape: "Tight B Barre" }
-  },
-  "Bmaj7": {
-    standard: { frets: "0-2-1-1-0-0", shape: "Bmaj7 Low" },
-    open:     { frets: "0-9-8-8-0-0", shape: "Open Bmaj7 Dream" },
-    drop:     { frets: "0-x-8-8-7-x", shape: "Spread Maj7" },
-    tight:    { frets: "x-2-4-3-4-x", shape: "Compact Maj7" }
-  },
-  "Bmaj9": {
-    standard: { frets: "0-2-1-1-2-0", shape: "Bmaj9 Standard" },
-    open:     { frets: "0-9-8-6-0-0", shape: "Wide Open Maj9" },
-    drop:     { frets: "0-x-8-8-0-0", shape: "Spread Maj9 Drones" },
-    tight:    { frets: "x-2-1-1-2-2", shape: "Tight Maj9" }
-  },
-  "C": {
-    standard: { frets: "1-3-3-2-1-1", shape: "C Low Barre" },
-    open:     { frets: "1-3-2-0-0-0", shape: "Open Strings C" },
-    drop:     { frets: "1-x-2-0-1-0", shape: "Spread C Major" },
-    tight:    { frets: "x-3-2-0-1-0", shape: "Compact C" }
-  },
-  "Cmaj7": {
-    standard: { frets: "1-3-2-2-1-1", shape: "Cmaj7 Low" },
-    open:     { frets: "1-3-0-0-0-0", shape: "Open Drones Cmaj7" },
-    drop:     { frets: "1-x-2-0-0-0", shape: "Spread Cmaj7" },
-    tight:    { frets: "x-3-2-0-0-0", shape: "Compact Cmaj7" }
-  },
-  "Cmaj9": {
-    standard: { frets: "1-3-0-0-1-0", shape: "Cmaj9 Modern" },
-    open:     { frets: "1-10-9-0-0-0", shape: "Wide Open Cmaj9" },
-    drop:     { frets: "1-x-0-0-0-0", shape: "Wide Spread Cmaj9" },
-    tight:    { frets: "x-3-0-4-3-0", shape: "Tight Cmaj9" }
-  },
-  "D": {
-    standard: { frets: "3-2-0-0-3-3", shape: "D Standard" },
-    open:     { frets: "3-5-4-0-0-0", shape: "Open D Drones" },
-    drop:     { frets: "3-x-4-2-3-x", shape: "Spread D Major" },
-    tight:    { frets: "x-5-4-2-3-x", shape: "Tight D" }
-  },
-  "Dmaj7": {
-    standard: { frets: "3-x-0-2-2-2", shape: "Dmaj7 Standard" },
-    open:     { frets: "3-5-0-0-0-0", shape: "Open Dmaj7 Drones" },
-    drop:     { frets: "3-x-4-2-2-x", shape: "Spread Dmaj7" },
-    tight:    { frets: "x-5-4-2-2-2", shape: "Tight Dmaj7" }
-  },
-  "Dadd9": {
-    standard: { frets: "3-0-0-2-3-0", shape: "Dadd9 Standard" },
-    open:     { frets: "3-5-4-0-0-0", shape: "Open Dadd9" },
-    drop:     { frets: "3-x-2-2-3-0", shape: "Spread Dadd9" },
-    tight:    { frets: "x-5-2-2-3-0", shape: "Compact Dadd9" }
-  },
-  "Em": {
-    standard: { frets: "x-0-2-2-1-0", shape: "Em Standard" },
-    open:     { frets: "5-7-5-0-0-0", shape: "Open Em Drones" },
-    drop:     { frets: "5-x-5-4-5-x", shape: "Spread Em" },
-    tight:    { frets: "x-0-2-2-0-0", shape: "Tight Low Em" }
-  },
-  "Em7": {
-    standard: { frets: "x-0-2-0-1-0", shape: "Em7 Standard" },
-    open:     { frets: "5-7-0-0-0-0", shape: "Open Em7 Drones" },
-    drop:     { frets: "5-x-5-4-3-0", shape: "Spread Em7" },
-    tight:    { frets: "x-0-0-0-0-0", shape: "Compact Em7" }
-  },
-  "Em9": {
-    standard: { frets: "x-0-2-0-0-2", shape: "Em9 Standard" },
-    open:     { frets: "5-7-4-0-0-0", shape: "Wide Open Em9" },
-    drop:     { frets: "5-x-4-0-0-0", shape: "Spread Em9" },
-    tight:    { frets: "x-0-4-0-3-0", shape: "Tight Em9" }
-  },
-  "F#m": {
-    standard: { frets: "x-2-4-4-3-2", shape: "F#m Barre" },
-    open:     { frets: "2-4-4-0-0-0", shape: "Open F#m Drones" },
-    drop:     { frets: "2-x-4-2-2-x", shape: "Spread F#m" },
-    tight:    { frets: "x-2-4-2-2-2", shape: "Tight F#m" }
-  },
-  "F#m7": {
-    standard: { frets: "x-2-4-2-3-2", shape: "F#m7 Standard" },
-    open:     { frets: "2-4-0-0-0-0", shape: "Open F#m7 Drones" },
-    drop:     { frets: "2-x-2-2-2-x", shape: "Spread F#m7" },
-    tight:    { frets: "x-2-2-2-2-2", shape: "Compact F#m7" }
-  },
-  "F#7sus4": {
-    standard: { frets: "2-4-2-4-2-2", shape: "F#7sus4 Standard" },
-    open:     { frets: "2-4-2-0-0-0", shape: "Open F#7sus4" },
-    drop:     { frets: "2-x-2-2-0-0", shape: "Spread F#7sus4" },
-    tight:    { frets: "x-2-4-2-2-0", shape: "Tight F#7sus4" }
-  },
-  "G": {
-    standard: { frets: "x-3-2-0-1-0", shape: "G Standard" },
-    open:     { frets: "3-2-0-0-0-0", shape: "Open G Drones" },
-    drop:     { frets: "3-x-5-4-3-x", shape: "Spread G Major" },
-    tight:    { frets: "x-3-5-4-3-3", shape: "Tight G" }
-  },
-  "Gmaj7": {
-    standard: { frets: "x-3-2-0-0-0", shape: "Gmaj7 Standard" },
-    open:     { frets: "3-2-0-0-0-0", shape: "Open Gmaj7 Drones" },
-    drop:     { frets: "3-x-4-4-3-0", shape: "Spread Gmaj7" },
-    tight:    { frets: "x-3-4-4-3-x", shape: "Tight Gmaj7" }
-  },
-  "Gadd9": {
-    standard: { frets: "3-0-0-0-0-0", shape: "Gadd9 Standard" },
-    open:     { frets: "3-2-0-2-0-0", shape: "Open Gadd9 Drones" },
-    drop:     { frets: "3-x-0-2-0-0", shape: "Spread Gadd9" },
-    tight:    { frets: "x-3-0-2-3-3", shape: "Tight Gadd9" }
-  },
-  "Am": {
-    standard: { frets: "x-5-7-7-6-5", shape: "Am Barre" },
-    open:     { frets: "x-0-2-2-1-0", shape: "Open Am Drones" },
-    drop:     { frets: "5-x-7-5-5-x", shape: "Spread Am" },
-    tight:    { frets: "x-0-2-2-1-0", shape: "Tight Low Am" }
-  },
-  "Am7": {
-    standard: { frets: "x-5-7-5-6-5", shape: "Am7 Barre" },
-    open:     { frets: "x-0-2-0-1-0", shape: "Open Am7 Drones" },
-    drop:     { frets: "5-x-5-5-5-x", shape: "Spread Am7" },
-    tight:    { frets: "x-0-2-0-1-0", shape: "Tight Am7" }
-  },
-  "Am9": {
-    standard: { frets: "x-0-2-4-1-0", shape: "Am9 Standard" },
-    open:     { frets: "x-0-5-5-0-0", shape: "Open Am9 Drones" },
-    drop:     { frets: "5-x-5-5-0-0", shape: "Spread Am9" },
-    tight:    { frets: "x-0-2-4-1-3", shape: "Tight Am9" }
-  }
+  "Bm": { standard: { frets: "0-2-2-0-0-0", shape: "Low B Root Bar" }, open: { frets: "0-9-9-7-0-0", shape: "Open B/F# Drones" }, drop: { frets: "0-x-9-7-7-x", shape: "Spread Drop-2" }, tight: { frets: "0-2-4-4-3-0", shape: "Tight Low Power" } },
+  "Bm7": { standard: { frets: "0-2-0-0-0-0", shape: "Low B7" }, open: { frets: "0-9-7-7-0-0", shape: "Open Bm7 Drones" }, drop: { frets: "0-x-7-7-7-7", shape: "Spread Minor 7th" }, tight: { frets: "0-2-0-2-3-0", shape: "Compact m7" } },
+  "Bm9": { standard: { frets: "0-2-0-2-2-0", shape: "Bm9 Standard" }, open: { frets: "0-9-0-7-0-0", shape: "Wide Open Bm9" }, drop: { frets: "0-x-7-6-7-x", shape: "Spread Bm9" }, tight: { frets: "x-2-0-2-2-2", shape: "High-register m9" } },
+  "Bm11": { standard: { frets: "0-0-0-0-0-0", shape: "All-Open Drone Bm11" }, open: { frets: "0-9-9-7-0-0", shape: "Shoegaze Open m11" }, drop: { frets: "0-x-7-7-5-0", shape: "Wide Spread m11" }, tight: { frets: "0-2-2-2-3-0", shape: "Low m11" } },
+  "B": { standard: { frets: "0-2-2-1-0-0", shape: "B Major Low" }, open: { frets: "0-9-9-8-0-0", shape: "Open B Major" }, drop: { frets: "0-x-9-8-7-x", shape: "Spread Major" }, tight: { frets: "0-2-4-4-4-x", shape: "Tight B Barre" } },
+  "Bmaj7": { standard: { frets: "0-2-1-1-0-0", shape: "Bmaj7 Low" }, open: { frets: "0-9-8-8-0-0", shape: "Open Bmaj7 Dream" }, drop: { frets: "0-x-8-8-7-x", shape: "Spread Maj7" }, tight: { frets: "x-2-4-3-4-x", shape: "Compact Maj7" } },
+  "Bmaj9": { standard: { frets: "0-2-1-1-2-0", shape: "Bmaj9 Standard" }, open: { frets: "0-9-8-6-0-0", shape: "Wide Open Maj9" }, drop: { frets: "0-x-8-8-0-0", shape: "Spread Maj9 Drones" }, tight: { frets: "x-2-1-1-2-2", shape: "Tight Maj9" } },
+  "C": { standard: { frets: "1-3-3-2-1-1", shape: "C Low Barre" }, open: { frets: "1-3-2-0-0-0", shape: "Open Strings C" }, drop: { frets: "1-x-2-0-1-0", shape: "Spread C Major" }, tight: { frets: "x-3-2-0-1-0", shape: "Compact C" } },
+  "Cmaj7": { standard: { frets: "1-3-2-2-1-1", shape: "Cmaj7 Low" }, open: { frets: "1-3-0-0-0-0", shape: "Open Drones Cmaj7" }, drop: { frets: "1-x-2-0-0-0", shape: "Spread Cmaj7" }, tight: { frets: "x-3-2-0-0-0", shape: "Compact Cmaj7" } },
+  "Cmaj9": { standard: { frets: "1-3-0-0-1-0", shape: "Cmaj9 Modern" }, open: { frets: "1-10-9-0-0-0", shape: "Wide Open Cmaj9" }, drop: { frets: "1-x-0-0-0-0", shape: "Wide Spread Cmaj9" }, tight: { frets: "x-3-0-4-3-0", shape: "Tight Cmaj9" } },
+  "D": { standard: { frets: "3-2-0-0-3-3", shape: "D Standard" }, open: { frets: "3-5-4-0-0-0", shape: "Open D Drones" }, drop: { frets: "3-x-4-2-3-x", shape: "Spread D Major" }, tight: { frets: "x-5-4-2-3-x", shape: "Tight D" } },
+  "Dmaj7": { standard: { frets: "3-x-0-2-2-2", shape: "Dmaj7 Standard" }, open: { frets: "3-5-0-0-0-0", shape: "Open Dmaj7 Drones" }, drop: { frets: "3-x-4-2-2-x", shape: "Spread Dmaj7" }, tight: { frets: "x-5-4-2-2-2", shape: "Tight Dmaj7" } },
+  "Dadd9": { standard: { frets: "3-0-0-2-3-0", shape: "Dadd9 Standard" }, open: { frets: "3-5-4-0-0-0", shape: "Open Dadd9" }, drop: { frets: "3-x-2-2-3-0", shape: "Spread Dadd9" }, tight: { frets: "x-5-2-2-3-0", shape: "Compact Dadd9" } },
+  "Em": { standard: { frets: "x-0-2-2-1-0", shape: "Em Standard" }, open: { frets: "5-7-5-0-0-0", shape: "Open Em Drones" }, drop: { frets: "5-x-5-4-5-x", shape: "Spread Em" }, tight: { frets: "x-0-2-2-0-0", shape: "Tight Low Em" } },
+  "Em7": { standard: { frets: "x-0-2-0-1-0", shape: "Em7 Standard" }, open: { frets: "5-7-0-0-0-0", shape: "Open Em7 Drones" }, drop: { frets: "5-x-5-4-3-0", shape: "Spread Em7" }, tight: { frets: "x-0-0-0-0-0", shape: "Compact Em7" } },
+  "Em9": { standard: { frets: "x-0-2-0-0-2", shape: "Em9 Standard" }, open: { frets: "5-7-4-0-0-0", shape: "Wide Open Em9" }, drop: { frets: "5-x-4-0-0-0", shape: "Spread Em9" }, tight: { frets: "x-0-4-0-3-0", shape: "Tight Em9" } },
+  "F#m": { standard: { frets: "x-2-4-4-3-2", shape: "F#m Barre" }, open: { frets: "2-4-4-0-0-0", shape: "Open F#m Drones" }, drop: { frets: "2-x-4-2-2-x", shape: "Spread F#m" }, tight: { frets: "x-2-4-2-2-2", shape: "Tight F#m" } },
+  "F#m7": { standard: { frets: "x-2-4-2-3-2", shape: "F#m7 Standard" }, open: { frets: "2-4-0-0-0-0", shape: "Open F#m7 Drones" }, drop: { frets: "2-x-2-2-2-x", shape: "Spread F#m7" }, tight: { frets: "x-2-2-2-2-2", shape: "Compact F#m7" } },
+  "F#7sus4": { standard: { frets: "2-4-2-4-2-2", shape: "F#7sus4 Standard" }, open: { frets: "2-4-2-0-0-0", shape: "Open F#7sus4" }, drop: { frets: "2-x-2-2-0-0", shape: "Spread F#7sus4" }, tight: { frets: "x-2-4-2-2-0", shape: "Tight F#7sus4" } },
+  "G": { standard: { frets: "x-3-2-0-1-0", shape: "G Standard" }, open: { frets: "3-2-0-0-0-0", shape: "Open G Drones" }, drop: { frets: "3-x-5-4-3-x", shape: "Spread G Major" }, tight: { frets: "x-3-5-4-3-3", shape: "Tight G" } },
+  "Gmaj7": { standard: { frets: "x-3-2-0-0-0", shape: "Gmaj7 Standard" }, open: { frets: "3-2-0-0-0-0", shape: "Open Gmaj7 Drones" }, drop: { frets: "3-x-4-4-3-0", shape: "Spread Gmaj7" }, tight: { frets: "x-3-4-4-3-x", shape: "Tight Gmaj7" } },
+  "Gadd9": { standard: { frets: "3-0-0-0-0-0", shape: "Gadd9 Standard" }, open: { frets: "3-2-0-2-0-0", shape: "Open Gadd9 Drones" }, drop: { frets: "3-x-0-2-0-0", shape: "Spread Gadd9" }, tight: { frets: "x-3-0-2-3-3", shape: "Tight Gadd9" } },
+  "Am": { standard: { frets: "x-5-7-7-6-5", shape: "Am Barre" }, open: { frets: "x-0-2-2-1-0", shape: "Open Am Drones" }, drop: { frets: "5-x-7-5-5-x", shape: "Spread Am" }, tight: { frets: "x-0-2-2-1-0", shape: "Tight Low Am" } },
+  "Am7": { standard: { frets: "x-5-7-5-6-5", shape: "Am7 Barre" }, open: { frets: "x-0-2-0-1-0", shape: "Open Am7 Drones" }, drop: { frets: "5-x-5-5-5-x", shape: "Spread Am7" }, tight: { frets: "x-0-2-0-1-0", shape: "Tight Am7" } },
+  "Am9": { standard: { frets: "x-0-2-4-1-0", shape: "Am9 Standard" }, open: { frets: "x-0-5-5-0-0", shape: "Open Am9 Drones" }, drop: { frets: "5-x-5-5-0-0", shape: "Spread Am9" }, tight: { frets: "x-0-2-4-1-3", shape: "Tight Am9" } }
 };
 
 const midiNoteMap = {
@@ -302,84 +186,21 @@ const midiNoteMap = {
 };
 
 const chordIntervals = {
-  "": [0, 4, 7], 
-  "m": [0, 3, 7], 
-  "7": [0, 4, 7, 10],
-  "maj7": [0, 4, 7, 11], 
-  "m7": [0, 3, 7, 10], 
-  "dim": [0, 3, 6], 
-  "m7b5": [0, 3, 6, 10],
-  "add9": [0, 4, 7, 14],
-  "m9": [0, 3, 7, 10, 14],
-  "maj9": [0, 4, 7, 11, 14],
-  "m11": [0, 3, 7, 10, 14, 17],
-  "7sus4": [0, 5, 7, 10]
+  "": [0, 4, 7], "m": [0, 3, 7], "7": [0, 4, 7, 10],
+  "maj7": [0, 4, 7, 11], "m7": [0, 3, 7, 10], "dim": [0, 3, 6], "m7b5": [0, 3, 6, 10],
+  "add9": [0, 4, 7, 14], "m9": [0, 3, 7, 10, 14], "maj9": [0, 4, 7, 11, 14], "m11": [0, 3, 7, 10, 14, 17], "7sus4": [0, 5, 7, 10]
 };
 
 const keys = {
-  "Bm": { 
-    type: "minor", 
-    scale: [71, 73, 74, 76, 78, 79, 81], 
-    triads: { 1: "Bm", 2: "C#dim", 3: "D", 4: "Em", 5: "F#m", 55: "F#", 6: "G", 7: "A" }, 
-    sevenths: { 1: "Bm7", 2: "C#m7b5", 3: "Dmaj7", 4: "Em7", 5: "F#m7", 55: "F#7", 6: "Gmaj7", 7: "A7" },
-    smartExt: { 1: "Bm11", 2: "C#m7b5", 3: "Dadd9", 4: "Em9", 5: "F#7sus4", 55: "F#7", 6: "Gmaj7", 7: "A7" }
-  },
-  "B": { 
-    type: "major", 
-    scale: [71, 73, 75, 76, 78, 80, 82], 
-    triads: { 1: "B", 2: "C#m", 3: "D#m", 4: "E", 5: "F#", 6: "G#m", 7: "A#dim" }, 
-    sevenths: { 1: "Bmaj7", 2: "C#m7", 3: "D#m7", 4: "Emaj7", 5: "F#7", 6: "G#m7", 7: "A#m7b5" },
-    smartExt: { 1: "Bmaj9", 2: "C#m9", 3: "D#m7", 4: "Eadd9", 5: "F#7sus4", 6: "G#m11", 7: "A#m7b5" }
-  },
-  "Em": { 
-    type: "minor", 
-    scale: [64, 66, 67, 69, 71, 72, 74], 
-    triads: { 1: "Em", 2: "F#dim", 3: "G", 4: "Am", 5: "Bm", 55: "B", 6: "C", 7: "D" }, 
-    sevenths: { 1: "Em7", 2: "F#m7b5", 3: "Gmaj7", 4: "Am7", 5: "Bm7", 55: "B7", 6: "Cmaj7", 7: "D7" },
-    smartExt: { 1: "Em9", 2: "F#m7b5", 3: "Gadd9", 4: "Am9", 5: "Bm11", 55: "B7", 6: "Cmaj9", 7: "Dadd9" }
-  },
-  "E": { 
-    type: "major", 
-    scale: [64, 66, 68, 69, 71, 73, 75], 
-    triads: { 1: "E", 2: "F#m", 3: "G#m", 4: "A", 5: "B", 6: "C#m", 7: "D#dim" }, 
-    sevenths: { 1: "Emaj7", 2: "F#m7", 3: "G#m7", 4: "Amaj7", 5: "B7", 6: "C#m7", 7: "D#m7b5" },
-    smartExt: { 1: "Emaj9", 2: "F#m9", 3: "G#m7", 4: "Aadd9", 5: "B7sus4", 6: "C#m11", 7: "D#m7b5" }
-  },
-  "F#m":{ 
-    type: "minor", 
-    scale: [66, 68, 69, 71, 73, 74, 76], 
-    triads: { 1: "F#m", 2: "G#dim", 3: "A", 4: "Bm", 5: "C#m", 55: "C#", 6: "D", 7: "E" }, 
-    sevenths: { 1: "F#m7", 2: "G#m7b5", 3: "Amaj7", 4: "Bm7", 5: "C#m7", 55: "C#7", 6: "Dmaj7", 7: "E7" },
-    smartExt: { 1: "F#m7", 2: "G#m7b5", 3: "Aadd9", 4: "Bm11", 5: "C#m7", 55: "C#7", 6: "Dmaj9", 7: "Eadd9" }
-  },
-  "G": { 
-    type: "major", 
-    scale: [67, 69, 71, 72, 74, 76, 78], 
-    triads: { 1: "G", 2: "Am", 3: "Bm", 4: "C", 5: "D", 6: "Em", 7: "F#dim" }, 
-    sevenths: { 1: "Gmaj7", 2: "Am7", 3: "Bm7", 4: "Cmaj7", 5: "D7", 6: "Em7", 7: "F#m7b5" },
-    smartExt: { 1: "Gadd9", 2: "Am9", 3: "Bm11", 4: "Cmaj9", 5: "Dadd9", 6: "Em9", 7: "F#m7b5" }
-  },
-  "D": { 
-    type: "major", 
-    scale: [62, 64, 66, 67, 69, 71, 73], 
-    triads: { 1: "D", 2: "Em", 3: "F#m", 4: "G", 5: "A", 6: "Bm", 7: "C#dim" }, 
-    sevenths: { 1: "Dmaj7", 2: "Em7", 3: "F#m7", 4: "Gmaj7", 5: "A7", 6: "Bm7", 7: "C#m7b5" },
-    smartExt: { 1: "Dadd9", 2: "Em9", 3: "F#m7", 4: "Gmaj7", 5: "A7sus4", 6: "Bm11", 7: "C#m7b5" }
-  },
-  "Am": { 
-    type: "minor", 
-    scale: [69, 71, 72, 74, 76, 77, 79], 
-    triads: { 1: "Am", 2: "Bdim", 3: "C", 4: "Dm", 5: "Em", 55: "E", 6: "F", 7: "G" }, 
-    sevenths: { 1: "Am7", 2: "Bm7b5", 3: "Cmaj7", 4: "Dm7", 5: "Em7", 55: "E7", 6: "Fmaj7", 7: "G7" },
-    smartExt: { 1: "Am9", 2: "Bm7b5", 3: "Cmaj9", 4: "Dm9", 5: "Em11", 55: "E7", 6: "Fmaj9", 7: "Gadd9" }
-  },
-  "C": { 
-    type: "major", 
-    scale: [60, 62, 64, 65, 67, 69, 71], 
-    triads: { 1: "C", 2: "Dm", 3: "Em", 4: "F", 5: "G", 6: "Am", 7: "Bdim" }, 
-    sevenths: { 1: "Cmaj7", 2: "Dm7", 3: "Em7", 4: "Fmaj7", 5: "G7", 6: "Am7", 7: "Bm7b5" },
-    smartExt: { 1: "Cmaj9", 2: "Dm9", 3: "Em9", 4: "Fmaj7", 5: "Gadd9", 6: "Am9", 7: "Bm7b5" }
-  }
+  "Bm": { type: "minor", scale: [71, 73, 74, 76, 78, 79, 81], triads: { 1: "Bm", 2: "C#dim", 3: "D", 4: "Em", 5: "F#m", 55: "F#", 6: "G", 7: "A" }, sevenths: { 1: "Bm7", 2: "C#m7b5", 3: "Dmaj7", 4: "Em7", 5: "F#m7", 55: "F#7", 6: "Gmaj7", 7: "A7" }, smartExt: { 1: "Bm11", 2: "C#m7b5", 3: "Dadd9", 4: "Em9", 5: "F#7sus4", 55: "F#7", 6: "Gmaj7", 7: "A7" } },
+  "B":  { type: "major", scale: [71, 73, 75, 76, 78, 80, 82], triads: { 1: "B", 2: "C#m", 3: "D#m", 4: "E", 5: "F#", 6: "G#m", 7: "A#dim" }, sevenths: { 1: "Bmaj7", 2: "C#m7", 3: "D#m7", 4: "Emaj7", 5: "F#7", 6: "G#m7", 7: "A#m7b5" }, smartExt: { 1: "Bmaj9", 2: "C#m9", 3: "D#m7", 4: "Eadd9", 5: "F#7sus4", 6: "G#m11", 7: "A#m7b5" } },
+  "Em": { type: "minor", scale: [64, 66, 67, 69, 71, 72, 74], triads: { 1: "Em", 2: "F#dim", 3: "G", 4: "Am", 5: "Bm", 55: "B", 6: "C", 7: "D" }, sevenths: { 1: "Em7", 2: "F#m7b5", 3: "Gmaj7", 4: "Am7", 5: "Bm7", 55: "B7", 6: "Cmaj7", 7: "D7" }, smartExt: { 1: "Em9", 2: "F#m7b5", 3: "Gadd9", 4: "Am9", 5: "Bm11", 55: "B7", 6: "Cmaj9", 7: "Dadd9" } },
+  "E":  { type: "major", scale: [64, 66, 68, 69, 71, 73, 75], triads: { 1: "E", 2: "F#m", 3: "G#m", 4: "A", 5: "B", 6: "C#m", 7: "D#dim" }, sevenths: { 1: "Emaj7", 2: "F#m7", 3: "G#m7", 4: "Amaj7", 5: "B7", 6: "C#m7", 7: "D#m7b5" }, smartExt: { 1: "Emaj9", 2: "F#m9", 3: "G#m7", 4: "Aadd9", 5: "B7sus4", 6: "C#m11", 7: "D#m7b5" } },
+  "F#m":{ type: "minor", scale: [66, 68, 69, 71, 73, 74, 76], triads: { 1: "F#m", 2: "G#dim", 3: "A", 4: "Bm", 5: "C#m", 55: "C#", 6: "D", 7: "E" }, sevenths: { 1: "F#m7", 2: "G#m7b5", 3: "Amaj7", 4: "Bm7", 5: "C#m7", 55: "C#7", 6: "Dmaj7", 7: "E7" }, smartExt: { 1: "F#m7", 2: "G#m7b5", 3: "Aadd9", 4: "Bm11", 5: "C#m7", 55: "C#7", 6: "Dmaj9", 7: "Eadd9" } },
+  "G":  { type: "major", scale: [67, 69, 71, 72, 74, 76, 78], triads: { 1: "G", 2: "Am", 3: "Bm", 4: "C", 5: "D", 6: "Em", 7: "F#dim" }, sevenths: { 1: "Gmaj7", 2: "Am7", 3: "Bm7", 4: "Cmaj7", 5: "D7", 6: "Em7", 7: "F#m7b5" }, smartExt: { 1: "Gadd9", 2: "Am9", 3: "Bm11", 4: "Cmaj9", 5: "Dadd9", 6: "Em9", 7: "F#m7b5" } },
+  "D":  { type: "major", scale: [62, 64, 66, 67, 69, 71, 73], triads: { 1: "D", 2: "Em", 3: "F#m", 4: "G", 5: "A", 6: "Bm", 7: "C#dim" }, sevenths: { 1: "Dmaj7", 2: "Em7", 3: "F#m7", 4: "Gmaj7", 5: "A7", 6: "Bm7", 7: "C#m7b5" }, smartExt: { 1: "Dadd9", 2: "Em9", 3: "F#m7", 4: "Gmaj7", 5: "A7sus4", 6: "Bm11", 7: "C#m7b5" } },
+  "Am": { type: "minor", scale: [69, 71, 72, 74, 76, 77, 79], triads: { 1: "Am", 2: "Bdim", 3: "C", 4: "Dm", 5: "Em", 55: "E", 6: "F", 7: "G" }, sevenths: { 1: "Am7", 2: "Bm7b5", 3: "Cmaj7", 4: "Dm7", 5: "Em7", 55: "E7", 6: "Fmaj7", 7: "G7" }, smartExt: { 1: "Am9", 2: "Bm7b5", 3: "Cmaj9", 4: "Dm9", 5: "Em11", 55: "E7", 6: "Fmaj9", 7: "Gadd9" } },
+  "C":  { type: "major", scale: [60, 62, 64, 65, 67, 69, 71], triads: { 1: "C", 2: "Dm", 3: "Em", 4: "F", 5: "G", 6: "Am", 7: "Bdim" }, sevenths: { 1: "Cmaj7", 2: "Dm7", 3: "Em7", 4: "Fmaj7", 5: "G7", 6: "Am7", 7: "Bm7b5" }, smartExt: { 1: "Cmaj9", 2: "Dm9", 3: "Em9", 4: "Fmaj7", 5: "Gadd9", 6: "Am9", 7: "Bm7b5" } }
 };
 
 const rhythmPool = {
@@ -408,25 +229,25 @@ const rhythmPool = {
 
 const progressionsPool = {
   Intro: [
-    { name: "Electro-Grunge Hook", pattern: ["1", "6"], roman: "i - VI", mood: "⚡ Грязное, упругое вступление с тяжёлым суб-басом", s1Sound: "<span class='band-tag'>Dead Pony</span> <span class='synth-tag'>Mojito</span> Bass Synth + <span class='synth-tag'>Presence XT</span> Clean guitar." },
-    { name: "Arpeggiated Space Opener", pattern: ["1", "5", "6", "4"], roman: "I - V - vi - IV", mood: "🌌 Космическое звучание в стиле Muse", s1Sound: "<span class='band-tag'>Muse</span> <span class='synth-tag'>Mai Tai</span> Arp LFO + **Analog Delay**." }
+    { name: "Electro-Grunge Hook", pattern: ["1", "6"], roman: "i - VI", mood: "⚡ Грязное вступление с тяжёлым суб-басом", s1Sound: "<span class='band-tag'>Dead Pony</span> <span class='synth-tag'>Mojito</span> Bass Synth + Presence XT." },
+    { name: "Arpeggiated Space Opener", pattern: ["1", "5", "6", "4"], roman: "I - V - vi - IV", mood: "🌌 Космическое звучание в стиле Muse", s1Sound: "<span class='band-tag'>Muse</span> <span class='synth-tag'>Mai Tai</span> Arp LFO + Analog Delay." }
   ],
   Verse: [
-    { name: "Post-Pop-Punk Tension", pattern: ["1", "6", "3", "7"], roman: "i - VI - III - VII", mood: "🔥 Мелодичный, упругий, танцевальный кач", s1Sound: "<span class='band-tag'>Paramore</span> <span class='synth-tag'>Mai Tai</span> 80s Synth + Ampire guitar." },
-    { name: "Hard-Alternative Groove", pattern: ["6", "4", "1", "5"], roman: "vi - IV - I - V", mood: "🥊 Напористый, дерзкий гитарный ритм", s1Sound: "<span class='band-tag'>The Warning</span> <span class='synth-tag'>Splitter</span>: Низ на Fat Channel, верха на Flanger." }
+    { name: "Post-Pop-Punk Tension", pattern: ["1", "6", "3", "7"], roman: "i - VI - III - VII", mood: "🔥 Мелодичный, упругий кач", s1Sound: "<span class='band-tag'>Paramore</span> <span class='synth-tag'>Mai Tai</span> 80s Synth + Ampire guitar." },
+    { name: "Hard-Alternative Groove", pattern: ["6", "4", "1", "5"], roman: "vi - IV - I - V", mood: "🥊 Напористый гитарный ритм", s1Sound: "<span class='band-tag'>The Warning</span> <span class='synth-tag'>Splitter</span>: Низ Fat Channel, верха Flanger." }
   ],
   PreChorus: [
-    { name: "Dynamic Build-up", pattern: ["4", "5"], roman: "IV - V", mood: "🚀 Нарастающий разгон к припеву", s1Sound: "<span class='band-tag'>The Warning</span> <span class='synth-tag'>Deep Flight One</span> Noise Riser." }
+    { name: "Dynamic Build-up", pattern: ["4", "5"], roman: "IV - V", mood: "🚀 Нарастающий разгон к припеву", s1Sound: "<span class='band-tag'>The Warning</span> Noise Riser." }
   ],
   Chorus: [
-    { name: "Stadium Wall of Sound", pattern: ["1", "5", "6", "4"], roman: "I - V - vi - IV", mood: "💥 Взрывной припев, гибрид синт-баса и гитар", s1Sound: "<span class='band-tag'>Paramore / Muse</span> <span class='synth-tag'>Mai Tai</span> Super Saw + Ampire Fuzz." },
-    { name: "Post-Grunge Riot", pattern: ["6", "4", "1", "5"], roman: "vi - IV - I - V", mood: "⚡ Агрессивный, сырой припев с ярким хуком", s1Sound: "<span class='band-tag'>Dead Pony</span> <span class='synth-tag'>Mojito</span> Square Synth + Redlight Distortion." }
+    { name: "Stadium Wall of Sound", pattern: ["1", "5", "6", "4"], roman: "I - V - vi - IV", mood: "💥 Взрывной припев", s1Sound: "<span class='band-tag'>Paramore / Muse</span> Super Saw + Ampire Fuzz." },
+    { name: "Post-Grunge Riot", pattern: ["6", "4", "1", "5"], roman: "vi - IV - I - V", mood: "⚡ Агрессивный припев", s1Sound: "<span class='band-tag'>Dead Pony</span> Square Synth + Redlight Distortion." }
   ],
   Bridge: [
-    { name: "Synth-Arp Breakdown", pattern: ["4", "5", "3", "6"], roman: "IV - V - iii - vi", mood: "🛸 Технологичный срыв на синт-пассаж", s1Sound: "<span class='band-tag'>Muse</span> <span class='synth-tag'>Mai Tai</span> 16th Arp + Autofilter." }
+    { name: "Synth-Arp Breakdown", pattern: ["4", "5", "3", "6"], roman: "IV - V - iii - vi", mood: "🛸 Технологичный срыв", s1Sound: "<span class='band-tag'>Muse</span> 16th Arp + Autofilter." }
   ],
   Outro: [
-    { name: "High-Energy Climax Outro", pattern: ["4", "5", "1", "1"], roman: "IV - V - I - I", mood: "🎆 Финальная кульминация всей группы", s1Sound: "<span class='band-tag'>Paramore</span> <span class='synth-tag'>Mai Tai</span> Bright Lead + OpenAIR Reverb." }
+    { name: "High-Energy Climax Outro", pattern: ["4", "5", "1", "1"], roman: "IV - V - I - I", mood: "🎆 Финальная кульминация", s1Sound: "<span class='band-tag'>Paramore</span> Lead + OpenAIR Reverb." }
   ]
 };
 
@@ -442,20 +263,188 @@ const songStructure = [
 let currentProgressionSelection = {};
 let currentRhythmSelection = {};
 let userFeedback = {};
+let isPlayingGlobal = false;
+let audioCtx = null;
+let activeTimeouts = [];
+
+// === WEB AUDIO API SYNTHESIZER ENGINE ===
+
+function getAudioContext() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+  return audioCtx;
+}
+
+function midiToFreq(midi) {
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+function stopAllAudio() {
+  activeTimeouts.forEach(t => clearTimeout(t));
+  activeTimeouts = [];
+  isPlayingGlobal = false;
+  
+  const playBtn = document.getElementById("btn-play-song");
+  if (playBtn) {
+    playBtn.innerText = "▶️ Слушать трек";
+    playBtn.className = "btn-play-all";
+  }
+
+  songStructure.forEach(s => {
+    const card = document.getElementById(`section-card-${s.id}`);
+    if (card) card.classList.remove("playing");
+  });
+}
+
+function playChordAudio(chordName, duration = 1.8) {
+  const ctx = getAudioContext();
+  const notes = parseChordToMIDINotes(chordName);
+  
+  const masterGain = ctx.createGain();
+  masterGain.gain.setValueAtTime(0.2, ctx.currentTime);
+  masterGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+
+  // Distortion / Fuzz WaveShaper
+  const dist = ctx.createWaveShaper();
+  function makeDistortionCurve(amount) {
+    let k = amount, n_samples = 44100, curve = new Float32Array(n_samples), deg = Math.PI / 180;
+    for (let i = 0; i < n_samples; ++i) {
+      let x = i * 2 / n_samples - 1;
+      curve[i] = (3 + k) * x * 20 * deg / (Math.PI + k * Math.abs(x));
+    }
+    return curve;
+  }
+  dist.curve = makeDistortionCurve(25);
+  dist.over-sampling = '4x';
+
+  const filter = ctx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.setValueAtTime(2500, ctx.currentTime);
+
+  masterGain.connect(dist);
+  dist.connect(filter);
+  filter.connect(ctx.destination);
+
+  notes.forEach((midiNote, idx) => {
+    const osc = ctx.createOscillator();
+    osc.type = idx === 0 ? "sawtooth" : "triangle";
+    osc.frequency.setValueAtTime(midiToFreq(midiNote), ctx.currentTime);
+    osc.connect(masterGain);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + duration);
+  });
+}
+
+function playVocalNoteAudio(midiNote, durationSeconds) {
+  const ctx = getAudioContext();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(midiToFreq(midiNote), ctx.currentTime);
+
+  gain.gain.setValueAtTime(0.25, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + durationSeconds);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + durationSeconds);
+}
+
+function playSectionAudio(sectionId, onComplete) {
+  stopAllAudio();
+  const bpm = parseInt(document.getElementById("bpm-input").value) || 140;
+  const secondsPerBeat = 60 / bpm;
+  const currentKey = document.getElementById("key-select").value;
+  const useSmartExt = document.getElementById("smart-ext-toggle").checked;
+
+  const card = document.getElementById(`section-card-${sectionId}`);
+  if (card) card.classList.add("playing");
+
+  const progIndex = currentProgressionSelection[sectionId];
+  const sectionObj = songStructure.find(s => s.id === sectionId);
+  const progData = progressionsPool[sectionObj.type][progIndex];
+  const res = getChordsAndTabs(currentKey, progData.pattern, useSmartExt);
+  const { vocalNotes } = generateVocalNotes(sectionId);
+
+  // 1. Воспроизведение аккордов (по 4 доли на аккорд)
+  res.rawChords.forEach((chord, idx) => {
+    const chordTimeMs = idx * 4 * secondsPerBeat * 1000;
+    const t = setTimeout(() => {
+      playChordAudio(chord, secondsPerBeat * 3.8);
+    }, chordTimeMs);
+    activeTimeouts.push(t);
+  });
+
+  // 2. Воспроизведение вокальной линии
+  let vocalTimeMs = 0;
+  vocalNotes.forEach((vNote) => {
+    const durSec = (vNote.duration / 128) * secondsPerBeat;
+    const t = setTimeout(() => {
+      playVocalNoteAudio(vNote.note, durSec * 0.9);
+    }, vocalTimeMs);
+    activeTimeouts.push(t);
+    vocalTimeMs += durSec * 1000;
+  });
+
+  const totalDurationMs = Math.max(res.rawChords.length * 4 * secondsPerBeat * 1000, vocalTimeMs);
+  const finalTimeout = setTimeout(() => {
+    if (card) card.classList.remove("playing");
+    if (onComplete) onComplete();
+  }, totalDurationMs);
+  activeTimeouts.push(finalTimeout);
+}
+
+function togglePlayFullSong() {
+  if (isPlayingGlobal) {
+    stopAllAudio();
+    return;
+  }
+
+  stopAllAudio();
+  isPlayingGlobal = true;
+  const playBtn = document.getElementById("btn-play-song");
+  playBtn.innerText = "⏹️ Остановить";
+  playBtn.className = "btn-stop";
+
+  let currentSectionIdx = 0;
+
+  function playNextSection() {
+    if (currentSectionIdx >= songStructure.length || !isPlayingGlobal) {
+      stopAllAudio();
+      return;
+    }
+
+    const section = songStructure[currentSectionIdx];
+    const card = document.getElementById(`section-card-${section.id}`);
+    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    playSectionAudio(section.id, () => {
+      currentSectionIdx++;
+      playNextSection();
+    });
+  }
+
+  playNextSection();
+}
+
+// === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
 
 function splitIntoSyllables(text) {
   if (!text) return [];
   const words = text.replace(/[^a-zA-Zа-яА-ЯёЁ\s]/g, "").split(/\s+/);
   let syllables = [];
-
   words.forEach(word => {
     if (!word) return;
     const matches = word.match(/[^aeiouyаеёиоуыэюя]*[aeiouyаеёиоуыэюя]+(?:[^aeiouyаеёиоуыэюя]*$|[^aeiouyаеёиоуыэюя](?=[^aeiouyаеёиоуыэюя][aeiouyаеёиоуыэюя]))?/gi);
-    if (matches) {
-      syllables.push(...matches);
-    } else {
-      syllables.push(word);
-    }
+    if (matches) syllables.push(...matches);
+    else syllables.push(word);
   });
   return syllables;
 }
@@ -482,8 +471,9 @@ function init() {
         <div class="actions">
           <button class="feedback-btn ${userFeedback[section.id] === 'like' ? 'active-like' : ''}" onclick="toggleFeedback('${section.id}', 'like')">👍</button>
           <button class="feedback-btn ${userFeedback[section.id] === 'dislike' ? 'active-dislike' : ''}" onclick="toggleFeedback('${section.id}', 'dislike')">👎</button>
+          <button class="btn-play-section" onclick="playSectionAudio('${section.id}')">▶️ Прослушать</button>
           <button class="btn-evolve" onclick="evolveSection('${section.id}', '${section.type}')">🔥 Развить</button>
-          <button class="btn-vocal" onclick="downloadVocalMIDI('${section.id}')">🎤 Скачать Vocal MIDI</button>
+          <button class="btn-vocal" onclick="downloadVocalMIDI('${section.id}')">🎤 Vocal MIDI</button>
           <button class="btn-midi-section" onclick="downloadSectionMIDI('${section.id}')">💾 Chords MIDI</button>
           <select id="select-prog-${section.id}" onchange="onProgChange('${section.id}', this.value)">
             ${progressionsPool[section.type].map((p, idx) => `<option value="${idx}">${p.name}</option>`).join('')}
@@ -589,13 +579,7 @@ function buildMIDIFileFromEvents(events) {
   const microsecondsPerBeat = Math.round(60000000 / bpm);
 
   let trackBytes = [];
-  
-  trackBytes.push(...writeVarInt(0), 0xFF, 0x51, 0x03, 
-    (microsecondsPerBeat >> 16) & 0xFF, 
-    (microsecondsPerBeat >> 8) & 0xFF, 
-    microsecondsPerBeat & 0xFF
-  );
-
+  trackBytes.push(...writeVarInt(0), 0xFF, 0x51, 0x03, (microsecondsPerBeat >> 16) & 0xFF, (microsecondsPerBeat >> 8) & 0xFF, microsecondsPerBeat & 0xFF);
   trackBytes.push(...writeVarInt(0), 0xFF, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08);
 
   events.forEach(e => {
@@ -608,7 +592,6 @@ function buildMIDIFileFromEvents(events) {
   });
 
   trackBytes.push(...writeVarInt(0), 0xFF, 0x2F, 0x00);
-
   let header = [0x4D, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x01, 0x00, 0x80];
   let trackHeader = [0x4D, 0x54, 0x72, 0x6B, (trackBytes.length >> 24) & 0xFF, (trackBytes.length >> 16) & 0xFF, (trackBytes.length >> 8) & 0xFF, trackBytes.length & 0xFF];
 
@@ -780,7 +763,16 @@ function updateAll() {
     const progData = progressionsPool[section.type][progIndex];
     const res = getChordsAndTabs(currentKey, progData.pattern, useSmartExt);
     
-    document.getElementById(`chords-${section.id}`).innerText = res.chordsText;
+    // Форматирование аккордов с кнопками быстрых прослушиваний 🔊
+    const chordsContainer = document.getElementById(`chords-${section.id}`);
+    chordsContainer.innerHTML = "";
+    res.rawChords.forEach(ch => {
+      const badge = document.createElement("span");
+      badge.className = "chord-badge";
+      badge.innerHTML = `${ch} <button class="btn-chord-listen" title="Услышать аккорд" onclick="playChordAudio('${ch}')">🔊</button>`;
+      chordsContainer.appendChild(badge);
+    });
+
     document.getElementById(`mood-${section.id}`).innerText = progData.mood;
     document.getElementById(`num-${section.id}`).innerText = `${progData.name} (${progData.roman})`;
     
