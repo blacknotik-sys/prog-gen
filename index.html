@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Alt-Rock Chord, Rhythm & Vocal MIDI Generator for Studio One Pro in B Standard">
-  <title>Alt-Rock Song, MIDI & Sound Design Generator (B Standard)</title>
+  <meta name="description" content="Alt-Rock Chord, Rhythm & Vocal MIDI Generator with Web Audio Playback for Studio One Pro">
+  <title>Alt-Rock Song, MIDI & Vocal Player (B Standard)</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎸</text></svg>">
   <style>
     :root {
@@ -34,7 +34,11 @@
     button { cursor: pointer; }
     button:hover { background: var(--accent); color: #fff; }
     .btn-main { background: var(--accent); color: #fff; font-weight: bold; }
+    .btn-play-all { background: var(--accent-gold); color: #101014; font-weight: bold; border: none; }
+    .btn-play-all:hover { background: #e09200; color: #fff; }
     .btn-midi-all { background: var(--accent-green); color: #fff; font-weight: bold; }
+    .btn-play { background: #2b2616; color: var(--accent-gold); border: 1px solid var(--accent-gold); font-weight: bold; padding: 6px 10px; font-size: 12px; }
+    .btn-play:hover { background: var(--accent-gold); color: #101014; }
     .btn-midi-section { background: #252836; color: var(--accent-green); border: 1px solid var(--accent-green); font-weight: bold; padding: 6px 10px; font-size: 12px; }
     .btn-midi-section:hover { background: var(--accent-green); color: #fff; }
     .btn-vocal { background: #1c2b36; color: var(--accent-cyan); border: 1px solid var(--accent-cyan); font-weight: bold; padding: 6px 10px; font-size: 12px; }
@@ -113,8 +117,9 @@
     </label>
 
     <div style="display: flex; gap: 8px;">
-      <button class="btn-main" onclick="generateFullSong()">🎲 Сгенерировать весь трек</button>
-      <button class="btn-midi-all" onclick="downloadFullSongMIDI()">🎼 Скачать MIDI трека</button>
+      <button class="btn-main" onclick="generateFullSong()">🎲 Сгенерировать</button>
+      <button class="btn-play-all" onclick="playFullSongAudio()">▶️ Слушать всё</button>
+      <button class="btn-midi-all" onclick="downloadFullSongMIDI()">🎼 Скачать MIDI</button>
     </div>
   </div>
 
@@ -247,6 +252,110 @@ let currentProgressionSelection = {};
 let currentRhythmSelection = {};
 let userFeedback = {};
 
+// === ИНТЕГРИРОВАННЫЙ СИНТЕЗАТОР WEB AUDIO API ===
+let audioCtx = null;
+let activeOscillators = [];
+
+function getAudioContext() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+  return audioCtx;
+}
+
+function midiToFreq(midi) {
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+function stopAudio() {
+  activeOscillators.forEach(osc => {
+    try { osc.stop(); osc.disconnect(); } catch(e){}
+  });
+  activeOscillators = [];
+}
+
+function playNote(midi, startTime, duration, type = "triangle", gainValue = 0.15) {
+  const ctx = getAudioContext();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  osc.type = type;
+  osc.frequency.setValueAtTime(midiToFreq(midi), startTime);
+
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(gainValue, startTime + 0.03);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration - 0.02);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  osc.start(startTime);
+  osc.stop(startTime + duration);
+  activeOscillators.push(osc);
+}
+
+function playSectionAudio(sectionId) {
+  stopAudio();
+  const ctx = getAudioContext();
+  const bpm = parseInt(document.getElementById("bpm-input").value) || 140;
+  const beatDuration = 60 / bpm;
+  const currentKey = document.getElementById("key-select").value;
+  const useSevenths = document.getElementById("sevenths-toggle").checked;
+
+  const sectionObj = songStructure.find(s => s.id === sectionId);
+  const progIndex = currentProgressionSelection[sectionId];
+  const progData = progressionsPool[sectionObj.type][progIndex];
+  const res = getChordsAndTabs(currentKey, progData.pattern, useSevenths);
+
+  let now = ctx.currentTime + 0.1;
+
+  // Воспроизведение аккордов
+  res.rawChords.forEach(chord => {
+    let notes = parseChordToMIDINotes(chord);
+    notes.forEach(note => {
+      playNote(note, now, beatDuration * 3.8, "triangle", 0.12);
+    });
+    now += beatDuration * 4;
+  });
+
+  // Воспроизведение вокальной партии поверх аккордов
+  const { vocalNotes } = generateVocalNotes(sectionId);
+  let vocalNow = ctx.currentTime + 0.1;
+  vocalNotes.forEach(vn => {
+    const durSec = (vn.duration / 128) * beatDuration;
+    playNote(vn.note, vocalNow, durSec * 0.9, "sawtooth", 0.08);
+    vocalNow += durSec;
+  });
+}
+
+function playFullSongAudio() {
+  stopAudio();
+  const ctx = getAudioContext();
+  const bpm = parseInt(document.getElementById("bpm-input").value) || 140;
+  const beatDuration = 60 / bpm;
+  const currentKey = document.getElementById("key-select").value;
+  const useSevenths = document.getElementById("sevenths-toggle").checked;
+
+  let now = ctx.currentTime + 0.1;
+
+  songStructure.forEach(section => {
+    const progIndex = currentProgressionSelection[section.id];
+    const progData = progressionsPool[section.type][progIndex];
+    const res = getChordsAndTabs(currentKey, progData.pattern, useSevenths);
+
+    res.rawChords.forEach(chord => {
+      let notes = parseChordToMIDINotes(chord);
+      notes.forEach(note => {
+        playNote(note, now, beatDuration * 3.8, "triangle", 0.1);
+      });
+      now += beatDuration * 4;
+    });
+  });
+}
+
 function splitIntoSyllables(text) {
   if (!text) return [];
   const words = text.replace(/[^a-zA-Zа-яА-ЯёЁ\s]/g, "").split(/\s+/);
@@ -286,8 +395,9 @@ function init() {
         <div class="actions">
           <button class="feedback-btn ${userFeedback[section.id] === 'like' ? 'active-like' : ''}" onclick="toggleFeedback('${section.id}', 'like')">👍</button>
           <button class="feedback-btn ${userFeedback[section.id] === 'dislike' ? 'active-dislike' : ''}" onclick="toggleFeedback('${section.id}', 'dislike')">👎</button>
+          <button class="btn-play" onclick="playSectionAudio('${section.id}')">▶️ Слушать</button>
           <button class="btn-evolve" onclick="evolveSection('${section.id}', '${section.type}')">🔥 Развить</button>
-          <button class="btn-vocal" onclick="downloadVocalMIDI('${section.id}')">🎤 Скачать Vocal MIDI</button>
+          <button class="btn-vocal" onclick="downloadVocalMIDI('${section.id}')">🎤 Vocal MIDI</button>
           <button class="btn-midi-section" onclick="downloadSectionMIDI('${section.id}')">💾 Chords MIDI</button>
           <select id="select-prog-${section.id}" onchange="onProgChange('${section.id}', this.value)">
             ${progressionsPool[section.type].map((p, idx) => `<option value="${idx}">${p.name}</option>`).join('')}
@@ -373,8 +483,6 @@ function updateVocalPreview(sectionId) {
   if (previewEl) previewEl.innerText = previewText || "Введите текст...";
 }
 
-// === УНИВЕРСАЛЬНЫЙ БАЙТОВЫЙ ДВИЖОК ДЛЯ DAW (STUDIO ONE, REAPER, LOGIC) ===
-
 function writeVarInt(val) {
   let buffer = [];
   let b;
@@ -392,18 +500,14 @@ function buildMIDIFileFromEvents(events) {
   const microsecondsPerBeat = Math.round(60000000 / bpm);
 
   let trackBytes = [];
-  
-  // 1. Установка темпа BPM (Meta Event)
   trackBytes.push(...writeVarInt(0), 0xFF, 0x51, 0x03, 
     (microsecondsPerBeat >> 16) & 0xFF, 
     (microsecondsPerBeat >> 8) & 0xFF, 
     microsecondsPerBeat & 0xFF
   );
 
-  // 2. Установка размера 4/4 (Meta Event)
   trackBytes.push(...writeVarInt(0), 0xFF, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08);
 
-  // 3. Запись всех нотных событий
   events.forEach(e => {
     trackBytes.push(...writeVarInt(e.deltaTime));
     if (e.type === 0xFF) { 
@@ -413,10 +517,8 @@ function buildMIDIFileFromEvents(events) {
     }
   });
 
-  // 4. Закрывающий маркер конца трека
   trackBytes.push(...writeVarInt(0), 0xFF, 0x2F, 0x00);
 
-  // Заголовки стандартного MIDI файла (Format 0)
   let header = [0x4D, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x01, 0x00, 0x80];
   let trackHeader = [0x4D, 0x54, 0x72, 0x6B, (trackBytes.length >> 24) & 0xFF, (trackBytes.length >> 16) & 0xFF, (trackBytes.length >> 8) & 0xFF, trackBytes.length & 0xFF];
 
@@ -424,7 +526,6 @@ function buildMIDIFileFromEvents(events) {
 }
 
 function downloadMIDI(midiData, filename) {
-  // Исправлено: Универсальный тип octet-stream гарантирует корректную передачу в Studio One
   let blob = new Blob([midiData], { type: "application/octet-stream" });
   let link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
