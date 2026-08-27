@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alt-Rock Song, MIDI & Sound Design Generator (B Standard)</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎸</text></svg>">
+  <style>
+    :root {
+      --bg: #101014;
+      --card-bg: #181820;
+      --accent: #ff4757;
+      --accent-purple: #70a1ff;
+      --accent-green: #2ed573;
+      --accent-gold: #ffa502;
+      --accent-cyan: #1e90ff;
+      --text: #e1e1e6;
+      --text-dim: #a0a0b0;
+      --border: #282836;
+    }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; justify-content: center; }
+    .container { max-width: 980px; width: 100%; }
+    h1 { text-align: center; color: var(--accent); margin-bottom: 4px; }
+    .subtitle { text-align: center; color: var(--text-dim); font-size: 13px; margin-bottom: 25px; }
+    .controls-top { background: var(--card-bg); padding: 18px 20px; border-radius: 12px; border: 1px solid var(--border); display: flex; gap: 15px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 20px; }
+    .ctrl-group { display: flex; align-items: center; gap: 8px; }
+    .toggle-container { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: bold; color: var(--accent-gold); cursor: pointer; }
+    .tuning-badge { background: var(--accent); color: #fff; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; }
+    select, button, input[type="number"], textarea { padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); background: #232330; color: var(--text); font-size: 14px; transition: all 0.2s; }
+    input[type="number"] { width: 75px; font-weight: bold; color: var(--accent-cyan); }
+    textarea { width: 100%; height: 60px; box-sizing: border-box; resize: vertical; font-family: inherit; margin-top: 6px; }
+    select:focus, button:focus, input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+    button { cursor: pointer; }
+    button:hover { background: var(--accent); color: #fff; }
+    .btn-main { background: var(--accent); color: #fff; font-weight: bold; }
+    .btn-midi-all { background: var(--accent-green); color: #fff; font-weight: bold; }
+    .btn-midi-section { background: #252836; color: var(--accent-green); border: 1px solid var(--accent-green); font-weight: bold; padding: 6px 10px; font-size: 12px; }
+    .btn-midi-section:hover { background: var(--accent-green); color: #fff; }
+    .btn-vocal { background: #1c2b36; color: var(--accent-cyan); border: 1px solid var(--accent-cyan); font-weight: bold; padding: 6px 10px; font-size: 12px; }
+    .btn-vocal:hover { background: var(--accent-cyan); color: #fff; }
+    .btn-evolve { background: #3a1c42; color: #e056fd; border: 1px solid #be2edd; font-weight: bold; padding: 6px 10px; font-size: 12px; }
+    .btn-evolve:hover { background: #be2edd; color: #fff; }
+    .song-section { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); padding: 18px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px; transition: all 0.3s; }
+    .song-section.disliked { opacity: 0.45; filter: grayscale(0.6); border-color: #4a2020; }
+    .song-section.liked { border-color: var(--accent-green); box-shadow: 0 0 10px rgba(46, 213, 115, 0.15); }
+    .section-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+    .section-title { font-size: 18px; font-weight: bold; color: var(--accent); }
+    .feedback-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); background: #1c1c28; cursor: pointer; }
+    .feedback-btn.active-like { background: #1b472c; border-color: var(--accent-green); color: var(--accent-green); }
+    .feedback-btn.active-dislike { background: #4a1c1c; border-color: var(--accent); color: var(--accent); }
+    .progression-display { background: #121218; padding: 14px; border-radius: 8px; border: 1px solid #222230; }
+    .chords { font-size: 22px; font-weight: bold; letter-spacing: 1px; color: #fff; margin-bottom: 6px; }
+    .mood-box { font-size: 13px; color: var(--accent-gold); font-style: italic; margin-bottom: 8px; }
+    .numerals { font-size: 13px; color: var(--text-dim); }
+    .lyrics-box { background: #151620; border: 1px solid #2b2d40; border-radius: 8px; padding: 10px 14px; }
+    .lyrics-title { font-size: 13px; font-weight: bold; color: var(--accent-purple); display: flex; justify-content: space-between; align-items: center; }
+    .vocal-preview { font-family: monospace; font-size: 12px; color: var(--accent-cyan); margin-top: 8px; background: #0c1018; padding: 8px; border-radius: 6px; word-break: break-all; }
+    .rhythm-box { background: #12131a; border-left: 3px solid var(--accent); padding: 10px 14px; border-radius: 0 8px 8px 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+    .rhythm-info { font-size: 13px; }
+    .rhythm-pattern { font-family: monospace; font-size: 15px; font-weight: bold; color: var(--accent); letter-spacing: 1px; }
+    .tabs-box { background: #121218; border: 1px solid #222230; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 13px; }
+    .tabs-title { color: var(--accent-gold); font-weight: bold; margin-bottom: 8px; font-family: 'Segoe UI', sans-serif; }
+    .tabs-grid { display: flex; gap: 12px; flex-wrap: wrap; }
+    .tab-item { background: #1e1e2a; padding: 8px 12px; border-radius: 6px; border: 1px solid #2d2d3e; }
+    .tab-chord-name { color: #fff; font-weight: bold; font-size: 14px; }
+    .tab-frets { color: var(--accent-green); font-weight: bold; margin-top: 2px; }
+    .tab-shape { color: var(--text-dim); font-size: 11px; }
+    .sounddesign-box { background: #121622; border: 1px solid var(--accent-cyan); border-radius: 8px; padding: 12px 14px; }
+    .sounddesign-title { color: var(--accent-cyan); font-weight: bold; font-size: 14px; margin-bottom: 6px; }
+    .sounddesign-content { font-size: 13px; color: var(--text); line-height: 1.5; }
+    .synth-tag { background: #003650; color: var(--accent-cyan); padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; margin-right: 4px; }
+    .band-tag { background: #4b1220; color: var(--accent); padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; margin-right: 4px; }
+    .modulation-card { background: #14141d; border: 1px solid var(--accent-green); border-radius: 12px; padding: 20px; margin-top: 25px; }
+    .modulation-card h2 { margin-top: 0; color: var(--accent-green); font-size: 18px; }
+    .mod-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 15px; }
+    .mod-item { background: #1c1c28; padding: 12px; border-radius: 8px; border: 1px solid #2b2b3c; }
+    .mod-item-title { font-size: 11px; color: var(--text-dim); text-transform: uppercase; }
+    .mod-item-key { font-size: 16px; font-weight: bold; color: #fff; margin: 4px 0; }
+    .mod-item-desc { font-size: 12px; color: var(--accent-green); }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>🎸 Alt-Rock & Vocal MIDI Engine <span class="tuning-badge">B STANDARD</span></h1>
+  <div class="subtitle">Paramore • Dead Pony • The Warning • Muse Style</div>
+
+  <div class="controls-top">
+    <div class="ctrl-group">
+      <label for="key-select"><b>Тональность:</b> </label>
+      <select id="key-select" onchange="updateAll()">
+        <option value="Bm" selected>Bm (Си минор)</option>
+        <option value="B">B (Си мажор)</option>
+        <option value="Em">Em (Ми минор)</option>
+        <option value="E">E (Ми мажор)</option>
+        <option value="F#m">F#m (Фа-диез минор)</option>
+        <option value="G">G (Соль мажор)</option>
+        <option value="D">D (Ре мажор)</option>
+        <option value="Am">Am (Ля минор)</option>
+        <option value="C">C (До мажор)</option>
+      </select>
+    </div>
+
+    <div class="ctrl-group">
+      <label for="bpm-input"><b>BPM:</b> </label>
+      <input type="number" id="bpm-input" value="140" min="60" max="220" oninput="updateAll()">
+    </div>
+
+    <label class="toggle-container">
+      <input type="checkbox" id="sevenths-toggle" onchange="updateAll()">
+      ✨ Септаккорды / Add9
+    </label>
+
+    <div style="display: flex; gap: 8px;">
+      <button class="btn-main" onclick="generateFullSong()">🎲 Сгенерировать весь трек</button>
+      <button class="btn-midi-all" onclick="downloadFullSongMIDI()">🎼 Скачать MIDI трека</button>
+    </div>
+  </div>
+
+  <div id="sections-container"></div>
+
+  <div class="modulation-card">
+    <h2>🔄 Модуляции по кварто-квинтовому кругу</h2>
+    <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 0;">
+      Идеи гармонических сдвигов в припеве или бридже для смены атмосферы:
+    </p>
+    <div class="mod-grid" id="modulation-ideas"></div>
+  </div>
+</div>
+
+<script>
+const chordTabs = {
+  "Bm":   { frets: "0-2-2-0-0-0", shape: "Em shape" },
+  "Bm7":  { frets: "0-2-0-0-0-0", shape: "Em7 shape" },
+  "B":    { frets: "0-2-2-1-0-0", shape: "E shape" },
+  "Bmaj7":{ frets: "0-2-1-1-0-0", shape: "Emaj7 shape" },
+  "C":    { frets: "1-3-3-2-1-1", shape: "F shape" },
+  "Cmaj7":{ frets: "1-3-2-2-1-1", shape: "Fmaj7 shape" },
+  "Cm":   { frets: "1-3-3-1-1-1", shape: "Fm shape" },
+  "C#m":  { frets: "2-4-4-2-2-2", shape: "F#m shape" },
+  "C#m7": { frets: "2-4-2-2-2-2", shape: "F#m7 shape" },
+  "C#dim":{ frets: "x-4-5-3-5-x", shape: "Diminished" },
+  "C#m7b5":{frets: "x-4-5-4-5-x", shape: "Half-diminished" },
+  "D":    { frets: "3-2-0-0-3-3", shape: "G shape" },
+  "Dmaj7":{ frets: "3-x-0-2-2-2", shape: "Gmaj7 shape" },
+  "Dm":   { frets: "3-5-5-3-3-3", shape: "Gm shape" },
+  "E":    { frets: "x-0-2-2-2-0", shape: "A shape" },
+  "Emaj7":{ frets: "x-0-2-1-2-0", shape: "Amaj7 shape" },
+  "Em":   { frets: "x-0-2-2-1-0", shape: "Am shape" },
+  "Em7":  { frets: "x-0-2-0-1-0", shape: "Am7 shape" },
+  "F#":   { frets: "2-4-4-3-2-2", shape: "F# / B-shape" },
+  "F#7":  { frets: "2-4-2-3-2-2", shape: "F#7 shape" },
+  "F#m":  { frets: "x-2-4-4-3-2", shape: "Bm shape" },
+  "F#m7": { frets: "x-2-4-2-3-2", shape: "Bm7 shape" },
+  "F#dim":{ frets: "2-x-1-2-1-x", shape: "F#dim shape" },
+  "F#m7b5":{frets: "2-x-2-2-1-0", shape: "F#m7b5 shape" },
+  "G":    { frets: "x-3-2-0-1-0", shape: "C shape" },
+  "Gmaj7":{ frets: "x-3-2-0-0-0", shape: "Cmaj7 shape" },
+  "Gm":   { frets: "x-3-5-5-4-3", shape: "Cm shape" },
+  "G7":   { frets: "3-5-3-4-3-3", shape: "G7 shape" },
+  "Am":   { frets: "x-5-7-7-6-5", shape: "Dm shape" },
+  "Am7":  { frets: "x-5-7-5-6-5", shape: "Dm7 shape" }
+};
+
+const midiNoteMap = {
+  "C": 60, "C#": 61, "Db": 61, "D": 62, "D#": 63, "Eb": 63,
+  "E": 64, "F": 65, "F#": 66, "Gb": 66, "G": 67, "G#": 68,
+  "Ab": 68, "A": 69, "A#": 70, "Bb": 70, "B": 71
+};
+
+const chordIntervals = {
+  "": [0, 4, 7], "m": [0, 3, 7], "7": [0, 4, 7, 10],
+  "maj7": [0, 4, 7, 11], "m7": [0, 3, 7, 10], "dim": [0, 3, 6], "m7b5": [0, 3, 6, 10]
+};
+
+const keys = {
+  "Bm": { type: "minor", scale: [71, 73, 74, 76, 78, 79, 81], triads: { 1: "Bm", 2: "C#dim", 3: "D", 4: "Em", 5: "F#m", 55: "F#", 6: "G", 7: "A" }, sevenths: { 1: "Bm7", 2: "C#m7b5", 3: "Dmaj7", 4: "Em7", 5: "F#m7", 55: "F#7", 6: "Gmaj7", 7: "A7" } },
+  "B":  { type: "major", scale: [71, 73, 75, 76, 78, 80, 82], triads: { 1: "B", 2: "C#m", 3: "D#m", 4: "E", 5: "F#", 6: "G#m", 7: "A#dim" }, sevenths: { 1: "Bmaj7", 2: "C#m7", 3: "D#m7", 4: "Emaj7", 5: "F#7", 6: "G#m7", 7: "A#m7b5" } },
+  "Em": { type: "minor", scale: [64, 66, 67, 69, 71, 72, 74], triads: { 1: "Em", 2: "F#dim", 3: "G", 4: "Am", 5: "Bm", 55: "B", 6: "C", 7: "D" }, sevenths: { 1: "Em7", 2: "F#m7b5", 3: "Gmaj7", 4: "Am7", 5: "Bm7", 55: "B7", 6: "Cmaj7", 7: "D7" } },
+  "E":  { type: "major", scale: [64, 66, 68, 69, 71, 73, 75], triads: { 1: "E", 2: "F#m", 3: "G#m", 4: "A", 5: "B", 6: "C#m", 7: "D#dim" }, sevenths: { 1: "Emaj7", 2: "F#m7", 3: "G#m7", 4: "Amaj7", 5: "B7", 6: "C#m7", 7: "D#m7b5" } },
+  "F#m":{ type: "minor", scale: [66, 68, 69, 71, 73, 74, 76], triads: { 1: "F#m", 2: "G#dim", 3: "A", 4: "Bm", 5: "C#m", 55: "C#", 6: "D", 7: "E" }, sevenths: { 1: "F#m7", 2: "G#m7b5", 3: "Amaj7", 4: "Bm7", 5: "C#m7", 55: "C#7", 6: "Dmaj7", 7: "E7" } },
+  "G":  { type: "major", scale: [67, 69, 71, 72, 74, 76, 78], triads: { 1: "G", 2: "Am", 3: "Bm", 4: "C", 5: "D", 6: "Em", 7: "F#dim" }, sevenths: { 1: "Gmaj7", 2: "Am7", 3: "Bm7", 4: "Cmaj7", 5: "D7", 6: "Em7", 7: "F#m7b5" } },
+  "D":  { type: "major", scale: [62, 64, 66, 67, 69, 71, 73], triads: { 1: "D", 2: "Em", 3: "F#m", 4: "G", 5: "A", 6: "Bm", 7: "C#dim" }, sevenths: { 1: "Dmaj7", 2: "Em7", 3: "F#m7", 4: "Gmaj7", 5: "A7", 6: "Bm7", 7: "C#m7b5" } },
+  "Am": { type: "minor", scale: [69, 71, 72, 74, 76, 77, 79], triads: { 1: "Am", 2: "Bdim", 3: "C", 4: "Dm", 5: "Em", 55: "E", 6: "F", 7: "G" }, sevenths: { 1: "Am7", 2: "Bm7b5", 3: "Cmaj7", 4: "Dm7", 5: "Em7", 55: "E7", 6: "Fmaj7", 7: "G7" } },
+  "C":  { type: "major", scale: [60, 62, 64, 65, 67, 69, 71], triads: { 1: "C", 2: "Dm", 3: "Em", 4: "F", 5: "G", 6: "Am", 7: "Bdim" }, sevenths: { 1: "Cmaj7", 2: "Dm7", 3: "Em7", 4: "Fmaj7", 5: "G7", 6: "Am7", 7: "Bm7b5" } }
+};
+
+const rhythmPool = {
+  Intro: [
+    { name: "Post-Punk / Electro Arp Pulse", pattern: "1 & 2 & 3 & 4 & (Staccato synth + B-string drone)", desc: "Пульсирующие 8-е с выраженным синтезаторным кликом" },
+    { name: "Futuristic Space Clean (Muse Style)", pattern: "1 . & . | 2 . & . | 3 . & . | 4 . & .", desc: "Пространственный чёс с использованием Delay (1/8d)" }
+  ],
+  Verse: [
+    { name: "Dead Pony Industrial Groove", pattern: "↓ . ↓ . ↓ ↑ ↓ . (Tight Palm Mute)", desc: "Агрессивный, коротко нарезанный PM на 6-й струне B" },
+    { name: "The Warning / Paramore Driving Strum", pattern: "↓ . ↓ ↑ . ↑ ↓ ↑ | ↓ ↓ ↑ . ↑ ↓ ↑", desc: "Живой альтернативный чёс с акцентом на малый барабан" }
+  ],
+  PreChorus: [
+    { name: "Industrial Riser Build-up", pattern: "1 & 2 & 3 & 4 & | 1! 2! 3! 4! (Crescendo)", desc: "Плотный нарастающий PM-чёс с разгоном драм-семплов" }
+  ],
+  Chorus: [
+    { name: "Fuzz Synth-Rock Wall of Sound", pattern: "↓ ↓ ↓ ↓ | ↓ ↓ ↓ ↓ (All Downstrokes)", desc: "Стена звука: Fuzz-гитары дублируют Saw-синт" },
+    { name: "Paramore Energetic Pop-Punk Drive", pattern: "1 . & . | . & 3 . | . & 4 . (Syncopated)", desc: "Качающий припев с танцевальной синкопой" }
+  ],
+  Bridge: [
+    { name: "Muse Synth-Arp Arpeggiator Breakdown", pattern: "1 e & a 2 e & a 3 e & a 4 e & a", desc: "16-й арпеджированный пассаж с фильтрацией Auto-Filter" }
+  ],
+  Outro: [
+    { name: "High-Energy Guitar & Synth Climax", pattern: "1 & 2 & 3 & 4 & | 1! (Ring out)", desc: "Максимальный разгон и финальный сустейн на тонике B" }
+  ]
+};
+
+const progressionsPool = {
+  Intro: [
+    { name: "Electro-Grunge Hook", pattern: ["1", "6"], roman: "i - VI", mood: "⚡ Грязное, упругое вступление с тяжёлым суб-басом", s1Sound: "<span class='band-tag'>Dead Pony</span> <span class='synth-tag'>Mojito</span> Bass Synth + <span class='synth-tag'>Presence XT</span> Clean guitar." },
+    { name: "Arpeggiated Space Opener", pattern: ["1", "5", "6", "4"], roman: "I - V - vi - IV", mood: "🌌 Космическое звучание в стиле Muse", s1Sound: "<span class='band-tag'>Muse</span> <span class='synth-tag'>Mai Tai</span> Arp LFO + **Analog Delay**." }
+  ],
+  Verse: [
+    { name: "Post-Pop-Punk Tension", pattern: ["1", "6", "3", "7"], roman: "i - VI - III - VII", mood: "🔥 Мелодичный, упругий, танцевальный кач", s1Sound: "<span class='band-tag'>Paramore</span> <span class='synth-tag'>Mai Tai</span> 80s Synth + Ampire guitar." },
+    { name: "Hard-Alternative Groove", pattern: ["6", "4", "1", "5"], roman: "vi - IV - I - V", mood: "🥊 Напористый, дерзкий гитарный ритм", s1Sound: "<span class='band-tag'>The Warning</span> <span class='synth-tag'>Splitter</span>: Низ на Fat Channel, верха на Flanger." }
+  ],
+  PreChorus: [
+    { name: "Dynamic Build-up", pattern: ["4", "5"], roman: "IV - V", mood: "🚀 Нарастающий разгон к припеву", s1Sound: "<span class='band-tag'>The Warning</span> <span class='synth-tag'>Deep Flight One</span> Noise Riser." }
+  ],
+  Chorus: [
+    { name: "Stadium Wall of Sound", pattern: ["1", "5", "6", "4"], roman: "I - V - vi - IV", mood: "💥 Взрывной припев, гибрид синт-баса и гитар", s1Sound: "<span class='band-tag'>Paramore / Muse</span> <span class='synth-tag'>Mai Tai</span> Super Saw + Ampire Fuzz." },
+    { name: "Post-Grunge Riot", pattern: ["6", "4", "1", "5"], roman: "vi - IV - I - V", mood: "⚡ Агрессивный, сырой припев с ярким хуком", s1Sound: "<span class='band-tag'>Dead Pony</span> <span class='synth-tag'>Mojito</span> Square Synth + Redlight Distortion." }
+  ],
+  Bridge: [
+    { name: "Synth-Arp Breakdown", pattern: ["4", "5", "3", "6"], roman: "IV - V - iii - vi", mood: "🛸 Технологичный срыв на синт-пассаж", s1Sound: "<span class='band-tag'>Muse</span> <span class='synth-tag'>Mai Tai</span> 16th Arp + Autofilter." }
+  ],
+  Outro: [
+    { name: "High-Energy Climax Outro", pattern: ["4", "5", "1", "1"], roman: "IV - V - I - I", mood: "🎆 Финальная кульминация всей группы", s1Sound: "<span class='band-tag'>Paramore</span> <span class='synth-tag'>Mai Tai</span> Bright Lead + OpenAIR Reverb." }
+  ]
+};
+
+const songStructure = [
+  { id: "intro", title: "Вступление (Intro)", type: "Intro", defaultText: "Yeah, we are back again\nFeel the heavy noise inside" },
+  { id: "verse", title: "Куплет (Verse)", type: "Verse", defaultText: "Walking down the broken street tonight\nShadows calling, everything's alright" },
+  { id: "prechorus", title: "Пре-припев (Pre-Chorus)", type: "PreChorus", defaultText: "It's taking over me\nIt's all I wanna see" },
+  { id: "chorus", title: "Припев (Chorus)", type: "Chorus", defaultText: "We burn it down into the open sky\nNo turning back, we're gonna fly high" },
+  { id: "bridge", title: "Бридж (Bridge)", type: "Bridge", defaultText: "Break the walls around\nListen to the sound" },
+  { id: "outro", title: "Аутро (Outro)", type: "Outro", defaultText: "Fade into the dark\nLeaving just a spark" }
+];
+
+let currentProgressionSelection = {};
+let currentRhythmSelection = {};
+let userFeedback = {};
+
+function splitIntoSyllables(text) {
+  if (!text) return [];
+  const words = text.replace(/[^a-zA-Zа-яА-ЯёЁ\s]/g, "").split(/\s+/);
+  let syllables = [];
+
+  words.forEach(word => {
+    if (!word) return;
+    const matches = word.match(/[^aeiouyаеёиоуыэюя]*[aeiouyаеёиоуыэюя]+(?:[^aeiouyаеёиоуыэюя]*$|[^aeiouyаеёиоуыэюя](?=[^aeiouyаеёиоуыэюя][aeiouyаеёиоуыэюя]))?/gi);
+    if (matches) {
+      syllables.push(...matches);
+    } else {
+      syllables.push(word);
+    }
+  });
+  return syllables;
+}
+
+function init() {
+  const savedFeedback = localStorage.getItem("altrock_generator_feedback");
+  if (savedFeedback) {
+    try { userFeedback = JSON.parse(savedFeedback); } catch(e) { userFeedback = {}; }
+  }
+
+  const container = document.getElementById("sections-container");
+  container.innerHTML = "";
+
+  songStructure.forEach(section => {
+    currentProgressionSelection[section.id] = 0;
+    currentRhythmSelection[section.id] = 0;
+
+    const div = document.createElement("div");
+    div.className = `song-section ${userFeedback[section.id] || ''}`;
+    div.id = `section-card-${section.id}`;
+    div.innerHTML = `
+      <div class="section-header">
+        <div class="section-title">${section.title}</div>
+        <div class="actions">
+          <button class="feedback-btn ${userFeedback[section.id] === 'like' ? 'active-like' : ''}" onclick="toggleFeedback('${section.id}', 'like')">👍</button>
+          <button class="feedback-btn ${userFeedback[section.id] === 'dislike' ? 'active-dislike' : ''}" onclick="toggleFeedback('${section.id}', 'dislike')">👎</button>
+          <button class="btn-evolve" onclick="evolveSection('${section.id}', '${section.type}')">🔥 Развить</button>
+          <button class="btn-vocal" onclick="downloadVocalMIDI('${section.id}')">🎤 Скачать Vocal MIDI</button>
+          <button class="btn-midi-section" onclick="downloadSectionMIDI('${section.id}')">💾 Chords MIDI</button>
+          <select id="select-prog-${section.id}" onchange="onProgChange('${section.id}', this.value)">
+            ${progressionsPool[section.type].map((p, idx) => `<option value="${idx}">${p.name}</option>`).join('')}
+          </select>
+          <button onclick="randomizeSection('${section.id}', '${section.type}')">🎲</button>
+        </div>
+      </div>
+
+      <div class="progression-display">
+        <div class="chords" id="chords-${section.id}">-</div>
+        <div class="mood-box" id="mood-${section.id}">-</div>
+        <div class="numerals" id="num-${section.id}">-</div>
+      </div>
+
+      <div class="lyrics-box">
+        <div class="lyrics-title">
+          <span>✍️ Текст песни и слоговый авто-мелодизатор:</span>
+          <span style="font-size:11px; font-weight:normal;" id="syl-count-${section.id}">0 слогов</span>
+        </div>
+        <textarea id="lyrics-${section.id}" oninput="updateVocalPreview('${section.id}')">${section.defaultText}</textarea>
+        <div class="vocal-preview" id="vocal-preview-${section.id}">-</div>
+      </div>
+
+      <div class="sounddesign-box">
+        <div class="sounddesign-title">🎛️ Studio One Pro 7 Playback & Synth Setup:</div>
+        <div class="sounddesign-content" id="s1sound-${section.id}">-</div>
+      </div>
+
+      <div class="rhythm-box">
+        <div class="rhythm-info">
+          <b>🥁 Ритмический рисунок / Штрих:</b>
+          <select id="select-rhythm-${section.id}" onchange="onRhythmChange('${section.id}', this.value)" style="margin-left: 8px;">
+            ${rhythmPool[section.type].map((r, idx) => `<option value="${idx}">${r.name}</option>`).join('')}
+          </select>
+          <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px;" id="rhythm-desc-${section.id}"></div>
+        </div>
+        <div class="rhythm-pattern" id="rhythm-pat-${section.id}"></div>
+      </div>
+
+      <div class="tabs-box">
+        <div class="tabs-title">🎸 Табулатуры и пальцовки (B Standard):</div>
+        <div class="tabs-grid" id="tabs-${section.id}"></div>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+
+  updateAll();
+}
+
+function generateVocalNotes(sectionId) {
+  const currentKey = document.getElementById("key-select").value;
+  const keyScale = keys[currentKey] ? keys[currentKey].scale : [60, 62, 64, 65, 67, 69, 71];
+  const lyricsInput = document.getElementById(`lyrics-${sectionId}`);
+  const lyricsText = lyricsInput ? lyricsInput.value : "";
+  const syllables = splitIntoSyllables(lyricsText);
+
+  let vocalNotes = [];
+  const ticksPerBeat = 128;
+
+  syllables.forEach((syl, idx) => {
+    const scaleIndex = (idx * 2 + (idx % 3)) % keyScale.length;
+    const note = keyScale[scaleIndex];
+    const duration = (idx % 4 === 3) ? ticksPerBeat * 2 : ticksPerBeat;
+    
+    vocalNotes.push({
+      syllable: syl,
+      note: note,
+      duration: duration
+    });
+  });
+
+  return { syllables, vocalNotes };
+}
+
+function updateVocalPreview(sectionId) {
+  const { syllables, vocalNotes } = generateVocalNotes(sectionId);
+  const countEl = document.getElementById(`syl-count-${sectionId}`);
+  if (countEl) countEl.innerText = `${syllables.length} слогов`;
+
+  const previewText = vocalNotes.map(n => `[${n.syllable}: MIDI ${n.note}]`).join(" ");
+  const previewEl = document.getElementById(`vocal-preview-${sectionId}`);
+  if (previewEl) previewEl.innerText = previewText || "Введите текст...";
+}
+
+function downloadVocalMIDI(sectionId) {
+  const { vocalNotes } = generateVocalNotes(sectionId);
+  if (!vocalNotes.length) return alert("Введите текст секции!");
+
+  let trackEvents = [];
+  vocalNotes.forEach(n => {
+    trackEvents.push({ deltaTime: 0, type: 0x90, note: n.note, velocity: 100 });
+    trackEvents.push({ deltaTime: n.duration, type: 0x80, note: n.note, velocity: 0 });
+  });
+
+  trackEvents.push({ deltaTime: 0, type: 0xFF, metaType: 0x2F, data: [] });
+  const midiData = buildMIDIFileFromEvents(trackEvents);
+  downloadMIDI(midiData, `Vocal_${sectionId}.mid`);
+}
+
+function buildMIDIFileFromEvents(trackEvents) {
+  function writeVarInt(val) {
+    let buffer = [];
+    let b;
+    while (true) {
+      b = val & 0x7F; val >>= 7;
+      if (val > 0) b |= 0x80;
+      buffer.push(b);
+      if (val === 0) break;
+    }
+    return buffer.reverse();
+  }
+
+  let trackBytes = [];
+  trackEvents.forEach(e => {
+    trackBytes.push(...writeVarInt(e.deltaTime));
+    if (e.type === 0xFF) { trackBytes.push(0xFF, e.metaType, 0x00); }
+    else { trackBytes.push(e.type, e.note, e.velocity); }
+  });
+
+  let header = [0x4D, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x01, 0x00, 0x80];
+  let trackHeader = [0x4D, 0x54, 0x72, 0x6B, (trackBytes.length >> 24) & 0xFF, (trackBytes.length >> 16) & 0xFF, (trackBytes.length >> 8) & 0xFF, trackBytes.length & 0xFF];
+
+  return new Uint8Array([...header, ...trackHeader, ...trackBytes]);
+}
+
+function toggleFeedback(sectionId, type) {
+  if (userFeedback[sectionId] === type) delete userFeedback[sectionId];
+  else userFeedback[sectionId] = type;
+  
+  localStorage.setItem("altrock_generator_feedback", JSON.stringify(userFeedback));
+  const card = document.getElementById(`section-card-${sectionId}`);
+  if (card) {
+    card.className = `song-section ${userFeedback[sectionId] || ''}`;
+    const btns = card.querySelectorAll('.feedback-btn');
+    if (btns.length >= 2) {
+      btns[0].className = `feedback-btn ${userFeedback[sectionId] === 'like' ? 'active-like' : ''}`;
+      btns[1].className = `feedback-btn ${userFeedback[sectionId] === 'dislike' ? 'active-dislike' : ''}`;
+    }
+  }
+}
+
+function evolveSection(sectionId, type) {
+  const currentKey = document.getElementById("key-select").value;
+  const progIndex = currentProgressionSelection[sectionId];
+  const baseProg = progressionsPool[type][progIndex];
+
+  let evolvedPattern = [...baseProg.pattern];
+  if (evolvedPattern.length === 2) evolvedPattern = [evolvedPattern[0], "5", evolvedPattern[1], "55"];
+  else if (evolvedPattern.length === 4) evolvedPattern = [evolvedPattern[0], evolvedPattern[1], evolvedPattern[2] + "sus4", evolvedPattern[3]];
+
+  const evolvedProg = {
+    name: `🔥 Evolved: ${baseProg.name}`,
+    pattern: evolvedPattern,
+    roman: `${baseProg.roman} (Advanced Voice-Leading)`,
+    mood: `💥 Развитая версия (${currentKey}): ${baseProg.mood}`,
+    s1Sound: `${baseProg.s1Sound} + Pitch Shifter.`
+  };
+
+  progressionsPool[type].push(evolvedProg);
+  const newIdx = progressionsPool[type].length - 1;
+  const selectEl = document.getElementById(`select-prog-${sectionId}`);
+  
+  if (selectEl) {
+    const opt = document.createElement("option");
+    opt.value = newIdx; opt.innerText = evolvedProg.name;
+    selectEl.appendChild(opt);
+    currentProgressionSelection[sectionId] = newIdx;
+    selectEl.value = newIdx;
+  }
+  
+  toggleFeedback(sectionId, 'like');
+  updateAll();
+}
+
+function getChordsAndTabs(key, pattern, useSevenths) {
+  const keyData = keys[key];
+  if (!keyData) return { chordsText: pattern.join(" - "), rawChords: [], tabsList: [] };
+  const chordMap = useSevenths ? keyData.sevenths : keyData.triads;
+  const rawChords = pattern.map(step => chordMap[step] || step);
+  const tabsList = rawChords.map(ch => {
+    const tabInfo = chordTabs[ch] || { frets: "x-x-x-x-x-x", shape: "Custom shape" };
+    return { name: ch, frets: tabInfo.frets, shape: tabInfo.shape };
+  });
+  return { chordsText: rawChords.join(" - "), rawChords: rawChords, tabsList: tabsList };
+}
+
+function parseChordToMIDINotes(chordName) {
+  let root = chordName.match(/^[A-G][#b]?/)[0];
+  let type = chordName.substring(root.length);
+  let rootPitch = midiNoteMap[root] || 60;
+  let intervals = chordIntervals[type] || [0, 4, 7];
+  return [rootPitch - 24, ...intervals.map(i => rootPitch + i)];
+}
+
+function downloadMIDI(midiData, filename) {
+  let blob = new Blob([midiData], { type: "audio/midi" });
+  let link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+}
+
+function downloadSectionMIDI(sectionId) {
+  const currentKey = document.getElementById("key-select").value;
+  const useSevenths = document.getElementById("sevenths-toggle").checked;
+  const progIndex = currentProgressionSelection[sectionId];
+  const sectionObj = songStructure.find(s => s.id === sectionId);
+  const progData = progressionsPool[sectionObj.type][progIndex];
+  
+  const res = getChordsAndTabs(currentKey, progData.pattern, useSevenths);
+  let trackEvents = [];
+  const ticksPerBeat = 128;
+
+  res.rawChords.forEach(chord => {
+    let notes = parseChordToMIDINotes(chord);
+    notes.forEach(n => trackEvents.push({ deltaTime: 0, type: 0x90, note: n, velocity: 90 }));
+    notes.forEach((n, idx) => trackEvents.push({ deltaTime: idx === 0 ? ticksPerBeat * 4 : 0, type: 0x80, note: n, velocity: 0 }));
+  });
+
+  trackEvents.push({ deltaTime: 0, type: 0xFF, metaType: 0x2F, data: [] });
+  const midiData = buildMIDIFileFromEvents(trackEvents);
+  downloadMIDI(midiData, `${sectionId}_Chords.mid`);
+}
+
+function downloadFullSongMIDI() {
+  const currentKey = document.getElementById("key-select").value;
+  const useSevenths = document.getElementById("sevenths-toggle").checked;
+  let trackEvents = [];
+  const ticksPerBeat = 128;
+
+  songStructure.forEach(section => {
+    const progIndex = currentProgressionSelection[section.id];
+    const progData = progressionsPool[section.type][progIndex];
+    const res = getChordsAndTabs(currentKey, progData.pattern, useSevenths);
+    
+    res.rawChords.forEach(chord => {
+      let notes = parseChordToMIDINotes(chord);
+      notes.forEach(n => trackEvents.push({ deltaTime: 0, type: 0x90, note: n, velocity: 90 }));
+      notes.forEach((n, idx) => trackEvents.push({ deltaTime: idx === 0 ? ticksPerBeat * 4 : 0, type: 0x80, note: n, velocity: 0 }));
+    });
+  });
+
+  trackEvents.push({ deltaTime: 0, type: 0xFF, metaType: 0x2F, data: [] });
+  const midiData = buildMIDIFileFromEvents(trackEvents);
+  downloadMIDI(midiData, `FullSong_${currentKey}.mid`);
+}
+
+function updateAll() {
+  const currentKey = document.getElementById("key-select").value;
+  const useSevenths = document.getElementById("sevenths-toggle").checked;
+
+  songStructure.forEach(section => {
+    const progIndex = currentProgressionSelection[section.id];
+    const progData = progressionsPool[section.type][progIndex];
+    const res = getChordsAndTabs(currentKey, progData.pattern, useSevenths);
+    
+    document.getElementById(`chords-${section.id}`).innerText = res.chordsText;
+    document.getElementById(`mood-${section.id}`).innerText = progData.mood;
+    document.getElementById(`num-${section.id}`).innerText = `${progData.name} (${progData.roman})`;
+    document.getElementById(`s1sound-${section.id}`).innerHTML = progData.s1Sound;
+
+    const tabsContainer = document.getElementById(`tabs-${section.id}`);
+    tabsContainer.innerHTML = "";
+    res.tabsList.forEach(t => {
+      const tabItem = document.createElement("div");
+      tabItem.className = "tab-item";
+      tabItem.innerHTML = `<div class="tab-chord-name">${t.name}</div><div class="tab-frets">${t.frets}</div><div class="tab-shape">${t.shape}</div>`;
+      tabsContainer.appendChild(tabItem);
+    });
+
+    const rhythmIndex = currentRhythmSelection[section.id];
+    const rhythmData = rhythmPool[section.type][rhythmIndex];
+    document.getElementById(`rhythm-pat-${section.id}`).innerText = rhythmData.pattern;
+    document.getElementById(`rhythm-desc-${section.id}`).innerText = rhythmData.desc;
+
+    updateVocalPreview(section.id);
+  });
+
+  renderModulations(currentKey);
+}
+
+function renderModulations(currentKey) {
+  const keyInfo = keys[currentKey];
+  const modContainer = document.getElementById("modulation-ideas");
+  modContainer.innerHTML = "";
+  if (!keyInfo) return;
+
+  const rules = [
+    { title: "Параллельный ключ", target: keyInfo.type === "major" ? currentKey + "m" : currentKey.replace("m", "") },
+    { title: "Квартовый шаг (IV)", target: keyInfo.triads[4] },
+    { title: "Квинтовый шаг (V)", target: keyInfo.triads[55] || keyInfo.triads[5] },
+    { title: "Подъем на тон ↑", target: "C / D..." }
+  ];
+
+  rules.forEach(item => {
+    const div = document.createElement("div");
+    div.className = "mod-item";
+    div.innerHTML = `<div class="mod-item-title">${item.title}</div><div class="mod-item-key">➜ ${item.target}</div><div class="mod-item-desc">💡 Через V7 целевой тональности</div>`;
+    modContainer.appendChild(div);
+  });
+}
+
+function onProgChange(sectionId, val) { currentProgressionSelection[sectionId] = parseInt(val); updateAll(); }
+function onRhythmChange(sectionId, val) { currentRhythmSelection[sectionId] = parseInt(val); updateAll(); }
+
+function randomizeSection(sectionId, type) {
+  const progPool = progressionsPool[type];
+  const rhythmList = rhythmPool[type];
+  currentProgressionSelection[sectionId] = Math.floor(Math.random() * progPool.length);
+  currentRhythmSelection[sectionId] = Math.floor(Math.random() * rhythmList.length);
+  document.getElementById(`select-prog-${sectionId}`).value = currentProgressionSelection[sectionId];
+  document.getElementById(`select-rhythm-${sectionId}`).value = currentRhythmSelection[sectionId];
+  updateAll();
+}
+
+function generateFullSong() {
+  songStructure.forEach(section => {
+    if (userFeedback[section.id] !== 'like') {
+      randomizeSection(section.id, section.type);
+    }
+  });
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+  init();
+});
+</script>
+
+</body>
+</html>
