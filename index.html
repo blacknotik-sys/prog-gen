@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Alt-Rock Chord, Rhythm & Vocal MIDI Generator with Web Audio Playback for Studio One Pro">
-  <title>Alt-Rock Song, MIDI & Vocal Player (B Standard)</title>
+  <meta name="description" content="Alt-Rock Chord, Rhythm & Vocal MIDI Generator for Studio One Pro in B Standard">
+  <title>Alt-Rock Song, MIDI & Sound Design Generator (B Standard)</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎸</text></svg>">
   <style>
     :root {
@@ -23,7 +23,7 @@
     .container { max-width: 980px; width: 100%; }
     h1 { text-align: center; color: var(--accent); margin-bottom: 4px; }
     .subtitle { text-align: center; color: var(--text-dim); font-size: 13px; margin-bottom: 25px; }
-    .controls-top { background: var(--card-bg); padding: 18px 20px; border-radius: 12px; border: 1px solid var(--border); display: flex; gap: 15px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 20px; }
+    .controls-top { background: var(--card-bg); padding: 18px 20px; border-radius: 12px; border: 1px solid var(--border); display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 20px; }
     .ctrl-group { display: flex; align-items: center; gap: 8px; }
     .toggle-container { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: bold; color: var(--accent-gold); cursor: pointer; }
     .tuning-badge { background: var(--accent); color: #fff; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; }
@@ -34,11 +34,11 @@
     button { cursor: pointer; }
     button:hover { background: var(--accent); color: #fff; }
     .btn-main { background: var(--accent); color: #fff; font-weight: bold; }
-    .btn-play-all { background: var(--accent-gold); color: #101014; font-weight: bold; border: none; }
+    .btn-play-all { background: var(--accent-gold); color: #101014; font-weight: bold; }
     .btn-play-all:hover { background: #e09200; color: #fff; }
-    .btn-midi-all { background: var(--accent-green); color: #fff; font-weight: bold; }
-    .btn-play { background: #2b2616; color: var(--accent-gold); border: 1px solid var(--accent-gold); font-weight: bold; padding: 6px 10px; font-size: 12px; }
+    .btn-play { background: #332912; color: var(--accent-gold); border: 1px solid var(--accent-gold); font-weight: bold; padding: 6px 10px; font-size: 12px; }
     .btn-play:hover { background: var(--accent-gold); color: #101014; }
+    .btn-midi-all { background: var(--accent-green); color: #fff; font-weight: bold; }
     .btn-midi-section { background: #252836; color: var(--accent-green); border: 1px solid var(--accent-green); font-weight: bold; padding: 6px 10px; font-size: 12px; }
     .btn-midi-section:hover { background: var(--accent-green); color: #fff; }
     .btn-vocal { background: #1c2b36; color: var(--accent-cyan); border: 1px solid var(--accent-cyan); font-weight: bold; padding: 6px 10px; font-size: 12px; }
@@ -48,6 +48,7 @@
     .song-section { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); padding: 18px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px; transition: all 0.3s; }
     .song-section.disliked { opacity: 0.45; filter: grayscale(0.6); border-color: #4a2020; }
     .song-section.liked { border-color: var(--accent-green); box-shadow: 0 0 10px rgba(46, 213, 115, 0.15); }
+    .song-section.playing { border-color: var(--accent-gold); box-shadow: 0 0 12px rgba(255, 165, 2, 0.4); }
     .section-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
     .section-title { font-size: 18px; font-weight: bold; color: var(--accent); }
     .feedback-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); background: #1c1c28; cursor: pointer; }
@@ -117,9 +118,9 @@
     </label>
 
     <div style="display: flex; gap: 8px;">
+      <button class="btn-play-all" onclick="playFullSongAudio()">▶ Слушать всё</button>
       <button class="btn-main" onclick="generateFullSong()">🎲 Сгенерировать</button>
-      <button class="btn-play-all" onclick="playFullSongAudio()">▶️ Слушать всё</button>
-      <button class="btn-midi-all" onclick="downloadFullSongMIDI()">🎼 Скачать MIDI</button>
+      <button class="btn-midi-all" onclick="downloadFullSongMIDI()">🎼 MIDI</button>
     </div>
   </div>
 
@@ -252,109 +253,147 @@ let currentProgressionSelection = {};
 let currentRhythmSelection = {};
 let userFeedback = {};
 
-// === ИНТЕГРИРОВАННЫЙ СИНТЕЗАТОР WEB AUDIO API ===
+// === WEB AUDIO SYNTHESIZER ENGINE ===
 let audioCtx = null;
-let activeOscillators = [];
+let activeAudioTimeouts = [];
 
-function getAudioContext() {
+function initAudio() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
   if (audioCtx.state === 'suspended') {
     audioCtx.resume();
   }
-  return audioCtx;
 }
 
-function midiToFreq(midi) {
-  return 440 * Math.pow(2, (midi - 69) / 12);
+function midiToFreq(midiNote) {
+  return 440 * Math.pow(2, (midiNote - 69) / 12);
 }
 
-function stopAudio() {
-  activeOscillators.forEach(osc => {
-    try { osc.stop(); osc.disconnect(); } catch(e){}
-  });
-  activeOscillators = [];
-}
+function playTone(freq, startTime, duration, isBass = false) {
+  if (!audioCtx) return;
+  
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
 
-function playNote(midi, startTime, duration, type = "triangle", gainValue = 0.15) {
-  const ctx = getAudioContext();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
+  // Синтез звука: Sawtooth для баса (рок-звучание), Triangle для аккордов
+  osc.type = isBass ? 'sawtooth' : 'triangle';
+  osc.frequency.setValueAtTime(freq, startTime);
 
-  osc.type = type;
-  osc.frequency.setValueAtTime(midiToFreq(midi), startTime);
+  // Фильтр для среза высоких частот
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(isBass ? 400 : 2000, startTime);
 
+  // Огибающая громкости (ADSR)
+  const attack = 0.02;
+  const decay = duration * 0.8;
   gain.gain.setValueAtTime(0, startTime);
-  gain.gain.linearRampToValueAtTime(gainValue, startTime + 0.03);
-  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration - 0.02);
+  gain.gain.linearRampToValueAtTime(isBass ? 0.3 : 0.15, startTime + attack);
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + attack + decay);
 
-  osc.connect(gain);
-  gain.connect(ctx.destination);
+  osc.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioCtx.destination);
 
   osc.start(startTime);
   osc.stop(startTime + duration);
-  activeOscillators.push(osc);
+}
+
+function stopAllAudio() {
+  activeAudioTimeouts.forEach(t => clearTimeout(t));
+  activeAudioTimeouts = [];
+  songStructure.forEach(s => {
+    const card = document.getElementById(`section-card-${s.id}`);
+    if (card) card.classList.remove('playing');
+  });
 }
 
 function playSectionAudio(sectionId) {
-  stopAudio();
-  const ctx = getAudioContext();
+  initAudio();
+  stopAllAudio();
+
+  const card = document.getElementById(`section-card-${sectionId}`);
+  if (card) card.classList.add('playing');
+
   const bpm = parseInt(document.getElementById("bpm-input").value) || 140;
-  const beatDuration = 60 / bpm;
+  const secondsPerBeat = 60 / bpm;
+  const durationPerChord = secondsPerBeat * 2; // Каждый аккорд звучит 2 доли
+
   const currentKey = document.getElementById("key-select").value;
   const useSevenths = document.getElementById("sevenths-toggle").checked;
-
-  const sectionObj = songStructure.find(s => s.id === sectionId);
   const progIndex = currentProgressionSelection[sectionId];
+  const sectionObj = songStructure.find(s => s.id === sectionId);
   const progData = progressionsPool[sectionObj.type][progIndex];
+  
   const res = getChordsAndTabs(currentKey, progData.pattern, useSevenths);
 
-  let now = ctx.currentTime + 0.1;
+  let now = audioCtx.currentTime + 0.05;
 
-  // Воспроизведение аккордов
-  res.rawChords.forEach(chord => {
+  res.rawChords.forEach((chord, idx) => {
     let notes = parseChordToMIDINotes(chord);
-    notes.forEach(note => {
-      playNote(note, now, beatDuration * 3.8, "triangle", 0.12);
+    let chordTime = now + (idx * durationPerChord);
+
+    notes.forEach((note, nIdx) => {
+      playTone(midiToFreq(note), chordTime, durationPerChord, nIdx === 0);
     });
-    now += beatDuration * 4;
   });
 
-  // Воспроизведение вокальной партии поверх аккордов
-  const { vocalNotes } = generateVocalNotes(sectionId);
-  let vocalNow = ctx.currentTime + 0.1;
-  vocalNotes.forEach(vn => {
-    const durSec = (vn.duration / 128) * beatDuration;
-    playNote(vn.note, vocalNow, durSec * 0.9, "sawtooth", 0.08);
-    vocalNow += durSec;
-  });
+  const totalTimeMs = res.rawChords.length * durationPerChord * 1000;
+  const timeout = setTimeout(() => {
+    if (card) card.classList.remove('playing');
+  }, totalTimeMs);
+  activeAudioTimeouts.push(timeout);
 }
 
 function playFullSongAudio() {
-  stopAudio();
-  const ctx = getAudioContext();
+  initAudio();
+  stopAllAudio();
+
   const bpm = parseInt(document.getElementById("bpm-input").value) || 140;
-  const beatDuration = 60 / bpm;
+  const secondsPerBeat = 60 / bpm;
+  const durationPerChord = secondsPerBeat * 2;
   const currentKey = document.getElementById("key-select").value;
   const useSevenths = document.getElementById("sevenths-toggle").checked;
 
-  let now = ctx.currentTime + 0.1;
+  let now = audioCtx.currentTime + 0.05;
+  let totalOffset = 0;
 
   songStructure.forEach(section => {
     const progIndex = currentProgressionSelection[section.id];
     const progData = progressionsPool[section.type][progIndex];
     const res = getChordsAndTabs(currentKey, progData.pattern, useSevenths);
+    const card = document.getElementById(`section-card-${section.id}`);
+
+    const sectionStartTimeMs = totalOffset * 1000;
+    const startTimeout = setTimeout(() => {
+      songStructure.forEach(s => {
+        const c = document.getElementById(`section-card-${s.id}`);
+        if (c) c.classList.remove('playing');
+      });
+      if (card) card.classList.add('playing');
+    }, sectionStartTimeMs);
+    activeAudioTimeouts.push(startTimeout);
 
     res.rawChords.forEach(chord => {
       let notes = parseChordToMIDINotes(chord);
-      notes.forEach(note => {
-        playNote(note, now, beatDuration * 3.8, "triangle", 0.1);
+      let chordTime = now + totalOffset;
+
+      notes.forEach((note, nIdx) => {
+        playTone(midiToFreq(note), chordTime, durationPerChord, nIdx === 0);
       });
-      now += beatDuration * 4;
+
+      totalOffset += durationPerChord;
     });
   });
+
+  const endTimeout = setTimeout(() => {
+    stopAllAudio();
+  }, totalOffset * 1000);
+  activeAudioTimeouts.push(endTimeout);
 }
+
+// === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ И ИНИЦИАЛИЗАЦИЯ ===
 
 function splitIntoSyllables(text) {
   if (!text) return [];
@@ -393,12 +432,12 @@ function init() {
       <div class="section-header">
         <div class="section-title">${section.title}</div>
         <div class="actions">
+          <button class="btn-play" onclick="playSectionAudio('${section.id}')">▶ Прослушать</button>
           <button class="feedback-btn ${userFeedback[section.id] === 'like' ? 'active-like' : ''}" onclick="toggleFeedback('${section.id}', 'like')">👍</button>
           <button class="feedback-btn ${userFeedback[section.id] === 'dislike' ? 'active-dislike' : ''}" onclick="toggleFeedback('${section.id}', 'dislike')">👎</button>
-          <button class="btn-play" onclick="playSectionAudio('${section.id}')">▶️ Слушать</button>
           <button class="btn-evolve" onclick="evolveSection('${section.id}', '${section.type}')">🔥 Развить</button>
           <button class="btn-vocal" onclick="downloadVocalMIDI('${section.id}')">🎤 Vocal MIDI</button>
-          <button class="btn-midi-section" onclick="downloadSectionMIDI('${section.id}')">💾 Chords MIDI</button>
+          <button class="btn-midi-section" onclick="downloadSectionMIDI('${section.id}')">💾 MIDI</button>
           <select id="select-prog-${section.id}" onchange="onProgChange('${section.id}', this.value)">
             ${progressionsPool[section.type].map((p, idx) => `<option value="${idx}">${p.name}</option>`).join('')}
           </select>
@@ -483,6 +522,8 @@ function updateVocalPreview(sectionId) {
   if (previewEl) previewEl.innerText = previewText || "Введите текст...";
 }
 
+// === БАЙТОВЫЙ ДВИЖОК ЭКСПОРА В MIDI ===
+
 function writeVarInt(val) {
   let buffer = [];
   let b;
@@ -505,7 +546,6 @@ function buildMIDIFileFromEvents(events) {
     (microsecondsPerBeat >> 8) & 0xFF, 
     microsecondsPerBeat & 0xFF
   );
-
   trackBytes.push(...writeVarInt(0), 0xFF, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08);
 
   events.forEach(e => {
