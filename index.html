@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Alt-Rock Chord, Rhythm & Vocal MIDI Generator for Studio One Pro in B Standard">
   <title>Alt-Rock Song, MIDI & Sound Design Generator (B Standard)</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎸</text></svg>">
   <style>
@@ -311,7 +312,7 @@ function init() {
       </div>
 
       <div class="sounddesign-box">
-        <div class="sounddesign-title">🎛️ Studio One Pro 7 Playback & Synth Setup:</div>
+        <div class="sounddesign-title">🎛️ Studio One Pro Playback & Synth Setup:</div>
         <div class="sounddesign-content" id="s1sound-${section.id}">-</div>
       </div>
 
@@ -372,6 +373,56 @@ function updateVocalPreview(sectionId) {
   if (previewEl) previewEl.innerText = previewText || "Введите текст...";
 }
 
+// === ПОЛНОСТЬЮ ИСПРАВЛЕННЫЙ ДВИЖОК ГЕНЕРАЦИИ MIDI ДЛЯ DAW (STUDIO ONE / REAPER) ===
+
+function writeVarInt(val) {
+  let buffer = [];
+  let b;
+  while (true) {
+    b = val & 0x7F; val >>= 7;
+    if (val > 0) b |= 0x80;
+    buffer.push(b);
+    if (val === 0) break;
+  }
+  return buffer.reverse();
+}
+
+function buildMIDIFileFromEvents(events) {
+  const bpm = parseInt(document.getElementById("bpm-input").value) || 140;
+  const microsecondsPerBeat = Math.round(60000000 / bpm);
+
+  let trackBytes = [];
+  
+  // 1. Установка темпа (Meta Event: Tempo)
+  trackBytes.push(...writeVarInt(0), 0xFF, 0x51, 0x03, 
+    (microsecondsPerBeat >> 16) & 0xFF, 
+    (microsecondsPerBeat >> 8) & 0xFF, 
+    microsecondsPerBeat & 0xFF
+  );
+
+  // 2. Установка размера 4/4 (Meta Event: Time Signature)
+  trackBytes.push(...writeVarInt(0), 0xFF, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08);
+
+  // 3. Запись нотных событий
+  events.forEach(e => {
+    trackBytes.push(...writeVarInt(e.deltaTime));
+    if (e.type === 0xFF) { 
+      trackBytes.push(0xFF, e.metaType, e.data.length, ...e.data); 
+    } else { 
+      trackBytes.push(e.type, e.note, e.velocity); 
+    }
+  });
+
+  // 4. Конец трека (Meta Event: End of Track)
+  trackBytes.push(...writeVarInt(0), 0xFF, 0x2F, 0x00);
+
+  // Формирование валидных заголовков MIDI формата 0
+  let header = [0x4D, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x01, 0x00, 0x80];
+  let trackHeader = [0x4D, 0x54, 0x72, 0x6B, (trackBytes.length >> 24) & 0xFF, (trackBytes.length >> 16) & 0xFF, (trackBytes.length >> 8) & 0xFF, trackBytes.length & 0xFF];
+
+  return new Uint8Array([...header, ...trackHeader, ...trackBytes]);
+}
+
 function downloadVocalMIDI(sectionId) {
   const { vocalNotes } = generateVocalNotes(sectionId);
   if (!vocalNotes.length) return alert("Введите текст секции!");
@@ -382,35 +433,59 @@ function downloadVocalMIDI(sectionId) {
     trackEvents.push({ deltaTime: n.duration, type: 0x80, note: n.note, velocity: 0 });
   });
 
-  trackEvents.push({ deltaTime: 0, type: 0xFF, metaType: 0x2F, data: [] });
   const midiData = buildMIDIFileFromEvents(trackEvents);
   downloadMIDI(midiData, `Vocal_${sectionId}.mid`);
 }
 
-function buildMIDIFileFromEvents(trackEvents) {
-  function writeVarInt(val) {
-    let buffer = [];
-    let b;
-    while (true) {
-      b = val & 0x7F; val >>= 7;
-      if (val > 0) b |= 0x80;
-      buffer.push(b);
-      if (val === 0) break;
-    }
-    return buffer.reverse();
-  }
+function downloadSectionMIDI(sectionId) {
+  const currentKey = document.getElementById("key-select").value;
+  const useSevenths = document.getElementById("sevenths-toggle").checked;
+  const progIndex = currentProgressionSelection[sectionId];
+  const sectionObj = songStructure.find(s => s.id === sectionId);
+  const progData = progressionsPool[sectionObj.type][progIndex];
+  
+  const res = getChordsAndTabs(currentKey, progData.pattern, useSevenths);
+  let trackEvents = [];
+  const ticksPerBeat = 128;
 
-  let trackBytes = [];
-  trackEvents.forEach(e => {
-    trackBytes.push(...writeVarInt(e.deltaTime));
-    if (e.type === 0xFF) { trackBytes.push(0xFF, e.metaType, 0x00); }
-    else { trackBytes.push(e.type, e.note, e.velocity); }
+  res.rawChords.forEach(chord => {
+    let notes = parseChordToMIDINotes(chord);
+    notes.forEach(n => trackEvents.push({ deltaTime: 0, type: 0x90, note: n, velocity: 90 }));
+    notes.forEach((n, idx) => trackEvents.push({ deltaTime: idx === 0 ? ticksPerBeat * 4 : 0, type: 0x80, note: n, velocity: 0 }));
   });
 
-  let header = [0x4D, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x01, 0x00, 0x80];
-  let trackHeader = [0x4D, 0x54, 0x72, 0x6B, (trackBytes.length >> 24) & 0xFF, (trackBytes.length >> 16) & 0xFF, (trackBytes.length >> 8) & 0xFF, trackBytes.length & 0xFF];
+  const midiData = buildMIDIFileFromEvents(trackEvents);
+  downloadMIDI(midiData, `${sectionId}_Chords.mid`);
+}
 
-  return new Uint8Array([...header, ...trackHeader, ...trackBytes]);
+function downloadFullSongMIDI() {
+  const currentKey = document.getElementById("key-select").value;
+  const useSevenths = document.getElementById("sevenths-toggle").checked;
+  let trackEvents = [];
+  const ticksPerBeat = 128;
+
+  songStructure.forEach(section => {
+    const progIndex = currentProgressionSelection[section.id];
+    const progData = progressionsPool[section.type][progIndex];
+    const res = getChordsAndTabs(currentKey, progData.pattern, useSevenths);
+    
+    res.rawChords.forEach(chord => {
+      let notes = parseChordToMIDINotes(chord);
+      notes.forEach(n => trackEvents.push({ deltaTime: 0, type: 0x90, note: n, velocity: 90 }));
+      notes.forEach((n, idx) => trackEvents.push({ deltaTime: idx === 0 ? ticksPerBeat * 4 : 0, type: 0x80, note: n, velocity: 0 }));
+    });
+  });
+
+  const midiData = buildMIDIFileFromEvents(trackEvents);
+  downloadMIDI(midiData, `FullSong_${currentKey}.mid`);
+}
+
+function downloadMIDI(midiData, filename) {
+  let blob = new Blob([midiData], { type: "audio/midi" });
+  let link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
 }
 
 function toggleFeedback(sectionId, type) {
@@ -480,59 +555,6 @@ function parseChordToMIDINotes(chordName) {
   let rootPitch = midiNoteMap[root] || 60;
   let intervals = chordIntervals[type] || [0, 4, 7];
   return [rootPitch - 24, ...intervals.map(i => rootPitch + i)];
-}
-
-function downloadMIDI(midiData, filename) {
-  let blob = new Blob([midiData], { type: "audio/midi" });
-  let link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = filename;
-  link.click();
-}
-
-function downloadSectionMIDI(sectionId) {
-  const currentKey = document.getElementById("key-select").value;
-  const useSevenths = document.getElementById("sevenths-toggle").checked;
-  const progIndex = currentProgressionSelection[sectionId];
-  const sectionObj = songStructure.find(s => s.id === sectionId);
-  const progData = progressionsPool[sectionObj.type][progIndex];
-  
-  const res = getChordsAndTabs(currentKey, progData.pattern, useSevenths);
-  let trackEvents = [];
-  const ticksPerBeat = 128;
-
-  res.rawChords.forEach(chord => {
-    let notes = parseChordToMIDINotes(chord);
-    notes.forEach(n => trackEvents.push({ deltaTime: 0, type: 0x90, note: n, velocity: 90 }));
-    notes.forEach((n, idx) => trackEvents.push({ deltaTime: idx === 0 ? ticksPerBeat * 4 : 0, type: 0x80, note: n, velocity: 0 }));
-  });
-
-  trackEvents.push({ deltaTime: 0, type: 0xFF, metaType: 0x2F, data: [] });
-  const midiData = buildMIDIFileFromEvents(trackEvents);
-  downloadMIDI(midiData, `${sectionId}_Chords.mid`);
-}
-
-function downloadFullSongMIDI() {
-  const currentKey = document.getElementById("key-select").value;
-  const useSevenths = document.getElementById("sevenths-toggle").checked;
-  let trackEvents = [];
-  const ticksPerBeat = 128;
-
-  songStructure.forEach(section => {
-    const progIndex = currentProgressionSelection[section.id];
-    const progData = progressionsPool[section.type][progIndex];
-    const res = getChordsAndTabs(currentKey, progData.pattern, useSevenths);
-    
-    res.rawChords.forEach(chord => {
-      let notes = parseChordToMIDINotes(chord);
-      notes.forEach(n => trackEvents.push({ deltaTime: 0, type: 0x90, note: n, velocity: 90 }));
-      notes.forEach((n, idx) => trackEvents.push({ deltaTime: idx === 0 ? ticksPerBeat * 4 : 0, type: 0x80, note: n, velocity: 0 }));
-    });
-  });
-
-  trackEvents.push({ deltaTime: 0, type: 0xFF, metaType: 0x2F, data: [] });
-  const midiData = buildMIDIFileFromEvents(trackEvents);
-  downloadMIDI(midiData, `FullSong_${currentKey}.mid`);
 }
 
 function updateAll() {
