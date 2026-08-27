@@ -373,7 +373,7 @@ function updateVocalPreview(sectionId) {
   if (previewEl) previewEl.innerText = previewText || "Введите текст...";
 }
 
-// === ПОЛНОСТЬЮ ИСПРАВЛЕННЫЙ ДВИЖОК ГЕНЕРАЦИИ MIDI ДЛЯ DAW (STUDIO ONE / REAPER) ===
+// === УНИВЕРСАЛЬНЫЙ БАЙТОВЫЙ ДВИЖОК ДЛЯ DAW (STUDIO ONE, REAPER, LOGIC) ===
 
 function writeVarInt(val) {
   let buffer = [];
@@ -393,17 +393,17 @@ function buildMIDIFileFromEvents(events) {
 
   let trackBytes = [];
   
-  // 1. Установка темпа (Meta Event: Tempo)
+  // 1. Установка темпа BPM (Meta Event)
   trackBytes.push(...writeVarInt(0), 0xFF, 0x51, 0x03, 
     (microsecondsPerBeat >> 16) & 0xFF, 
     (microsecondsPerBeat >> 8) & 0xFF, 
     microsecondsPerBeat & 0xFF
   );
 
-  // 2. Установка размера 4/4 (Meta Event: Time Signature)
+  // 2. Установка размера 4/4 (Meta Event)
   trackBytes.push(...writeVarInt(0), 0xFF, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08);
 
-  // 3. Запись нотных событий
+  // 3. Запись всех нотных событий
   events.forEach(e => {
     trackBytes.push(...writeVarInt(e.deltaTime));
     if (e.type === 0xFF) { 
@@ -413,14 +413,25 @@ function buildMIDIFileFromEvents(events) {
     }
   });
 
-  // 4. Конец трека (Meta Event: End of Track)
+  // 4. Закрывающий маркер конца трека
   trackBytes.push(...writeVarInt(0), 0xFF, 0x2F, 0x00);
 
-  // Формирование валидных заголовков MIDI формата 0
+  // Заголовки стандартного MIDI файла (Format 0)
   let header = [0x4D, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x01, 0x00, 0x80];
   let trackHeader = [0x4D, 0x54, 0x72, 0x6B, (trackBytes.length >> 24) & 0xFF, (trackBytes.length >> 16) & 0xFF, (trackBytes.length >> 8) & 0xFF, trackBytes.length & 0xFF];
 
   return new Uint8Array([...header, ...trackHeader, ...trackBytes]);
+}
+
+function downloadMIDI(midiData, filename) {
+  // Исправлено: Универсальный тип octet-stream гарантирует корректную передачу в Studio One
+  let blob = new Blob([midiData], { type: "application/octet-stream" });
+  let link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
 function downloadVocalMIDI(sectionId) {
@@ -478,14 +489,6 @@ function downloadFullSongMIDI() {
 
   const midiData = buildMIDIFileFromEvents(trackEvents);
   downloadMIDI(midiData, `FullSong_${currentKey}.mid`);
-}
-
-function downloadMIDI(midiData, filename) {
-  let blob = new Blob([midiData], { type: "audio/midi" });
-  let link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = filename;
-  link.click();
 }
 
 function toggleFeedback(sectionId, type) {
