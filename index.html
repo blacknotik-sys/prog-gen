@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Alt-Rock Chord, Voicings, Rhythm & Vocal MIDI Generator for Studio One Pro in B Standard">
-  <title>Alt-Rock Song, Wide Chords & Web Audio Player (B Standard)</title>
+  <title>Alt-Rock Song Engine (B Standard)</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎸</text></svg>">
   <style>
     :root {
@@ -57,7 +57,7 @@
     .feedback-btn.active-dislike { background: #4a1c1c; border-color: var(--accent); color: var(--accent); }
     .progression-display { background: #121218; padding: 14px; border-radius: 8px; border: 1px solid #222230; }
     .chords { font-size: 22px; font-weight: bold; letter-spacing: 1px; color: #fff; margin-bottom: 6px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    .chord-badge { background: #1c1c28; padding: 2px 8px; border-radius: 6px; border: 1px solid #2e2e42; display: inline-flex; align-items: center; gap: 6px; }
+    .chord-badge { background: #1c1c28; padding: 4px 10px; border-radius: 6px; border: 1px solid #2e2e42; display: inline-flex; align-items: center; gap: 6px; }
     .btn-chord-listen { background: none; border: none; padding: 0; color: var(--accent-gold); font-size: 14px; cursor: pointer; }
     .btn-chord-listen:hover { color: #fff; background: none; }
     .mood-box { font-size: 13px; color: var(--accent-gold); font-style: italic; margin-bottom: 8px; }
@@ -267,8 +267,6 @@ let isPlayingGlobal = false;
 let audioCtx = null;
 let activeTimeouts = [];
 
-// === WEB AUDIO API SYNTHESIZER ENGINE ===
-
 function getAudioContext() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -308,7 +306,6 @@ function playChordAudio(chordName, duration = 1.8) {
   masterGain.gain.setValueAtTime(0.2, ctx.currentTime);
   masterGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
 
-  // Distortion / Fuzz WaveShaper
   const dist = ctx.createWaveShaper();
   function makeDistortionCurve(amount) {
     let k = amount, n_samples = 44100, curve = new Float32Array(n_samples), deg = Math.PI / 180;
@@ -319,7 +316,7 @@ function playChordAudio(chordName, duration = 1.8) {
     return curve;
   }
   dist.curve = makeDistortionCurve(25);
-  dist.over-sampling = '4x';
+  dist.oversampling = '4x';
 
   const filter = ctx.createBiquadFilter();
   filter.type = "lowpass";
@@ -373,7 +370,6 @@ function playSectionAudio(sectionId, onComplete) {
   const res = getChordsAndTabs(currentKey, progData.pattern, useSmartExt);
   const { vocalNotes } = generateVocalNotes(sectionId);
 
-  // 1. Воспроизведение аккордов (по 4 доли на аккорд)
   res.rawChords.forEach((chord, idx) => {
     const chordTimeMs = idx * 4 * secondsPerBeat * 1000;
     const t = setTimeout(() => {
@@ -382,7 +378,6 @@ function playSectionAudio(sectionId, onComplete) {
     activeTimeouts.push(t);
   });
 
-  // 2. Воспроизведение вокальной линии
   let vocalTimeMs = 0;
   vocalNotes.forEach((vNote) => {
     const durSec = (vNote.duration / 128) * secondsPerBeat;
@@ -433,8 +428,6 @@ function togglePlayFullSong() {
 
   playNextSection();
 }
-
-// === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
 
 function splitIntoSyllables(text) {
   if (!text) return [];
@@ -763,38 +756,47 @@ function updateAll() {
     const progData = progressionsPool[section.type][progIndex];
     const res = getChordsAndTabs(currentKey, progData.pattern, useSmartExt);
     
-    // Форматирование аккордов с кнопками быстрых прослушиваний 🔊
     const chordsContainer = document.getElementById(`chords-${section.id}`);
-    chordsContainer.innerHTML = "";
-    res.rawChords.forEach(ch => {
-      const badge = document.createElement("span");
-      badge.className = "chord-badge";
-      badge.innerHTML = `${ch} <button class="btn-chord-listen" title="Услышать аккорд" onclick="playChordAudio('${ch}')">🔊</button>`;
-      chordsContainer.appendChild(badge);
-    });
+    if (chordsContainer) {
+      chordsContainer.innerHTML = "";
+      res.rawChords.forEach(ch => {
+        const badge = document.createElement("span");
+        badge.className = "chord-badge";
+        badge.innerHTML = `${ch} <button class="btn-chord-listen" title="Услышать аккорд" onclick="playChordAudio('${ch}')">🔊</button>`;
+        chordsContainer.appendChild(badge);
+      });
+    }
 
-    document.getElementById(`mood-${section.id}`).innerText = progData.mood;
-    document.getElementById(`num-${section.id}`).innerText = `${progData.name} (${progData.roman})`;
+    const moodEl = document.getElementById(`mood-${section.id}`);
+    if (moodEl) moodEl.innerText = progData.mood;
+
+    const numEl = document.getElementById(`num-${section.id}`);
+    if (numEl) numEl.innerText = `${progData.name} (${progData.roman})`;
     
     let psychoNote = useSmartExt ? " <span class='psycho-tag'>🧠 Psychoacoustic Spread: Drop-2/3 voicing</span>" : "";
-    document.getElementById(`s1sound-${section.id}`).innerHTML = progData.s1Sound + psychoNote;
+    const s1soundEl = document.getElementById(`s1sound-${section.id}`);
+    if (s1soundEl) s1soundEl.innerHTML = progData.s1Sound + psychoNote;
 
     const styleTagEl = document.getElementById(`voicing-style-tag-${section.id}`);
     if (styleTagEl) styleTagEl.innerText = voicingStyle.toUpperCase();
 
     const tabsContainer = document.getElementById(`tabs-${section.id}`);
-    tabsContainer.innerHTML = "";
-    res.tabsList.forEach(t => {
-      const tabItem = document.createElement("div");
-      tabItem.className = "tab-item";
-      tabItem.innerHTML = `<div class="tab-chord-name">${t.name}</div><div class="tab-frets">${t.frets}</div><div class="tab-shape">${t.shape}</div>`;
-      tabsContainer.appendChild(tabItem);
-    });
+    if (tabsContainer) {
+      tabsContainer.innerHTML = "";
+      res.tabsList.forEach(t => {
+        const tabItem = document.createElement("div");
+        tabItem.className = "tab-item";
+        tabItem.innerHTML = `<div class="tab-chord-name">${t.name}</div><div class="tab-frets">${t.frets}</div><div class="tab-shape">${t.shape}</div>`;
+        tabsContainer.appendChild(tabItem);
+      });
+    }
 
     const rhythmIndex = currentRhythmSelection[section.id];
     const rhythmData = rhythmPool[section.type][rhythmIndex];
-    document.getElementById(`rhythm-pat-${section.id}`).innerText = rhythmData.pattern;
-    document.getElementById(`rhythm-desc-${section.id}`).innerText = rhythmData.desc;
+    const rhythmPatEl = document.getElementById(`rhythm-pat-${section.id}`);
+    if (rhythmPatEl) rhythmPatEl.innerText = rhythmData.pattern;
+    const rhythmDescEl = document.getElementById(`rhythm-desc-${section.id}`);
+    if (rhythmDescEl) rhythmDescEl.innerText = rhythmData.desc;
 
     updateVocalPreview(section.id);
   });
@@ -805,6 +807,7 @@ function updateAll() {
 function renderModulations(currentKey) {
   const keyInfo = keys[currentKey];
   const modContainer = document.getElementById("modulation-ideas");
+  if (!modContainer) return;
   modContainer.innerHTML = "";
   if (!keyInfo) return;
 
@@ -831,8 +834,10 @@ function randomizeSection(sectionId, type) {
   const rhythmList = rhythmPool[type];
   currentProgressionSelection[sectionId] = Math.floor(Math.random() * progPool.length);
   currentRhythmSelection[sectionId] = Math.floor(Math.random() * rhythmList.length);
-  document.getElementById(`select-prog-${sectionId}`).value = currentProgressionSelection[sectionId];
-  document.getElementById(`select-rhythm-${sectionId}`).value = currentRhythmSelection[sectionId];
+  const progSel = document.getElementById(`select-prog-${sectionId}`);
+  if (progSel) progSel.value = currentProgressionSelection[sectionId];
+  const rhythmSel = document.getElementById(`select-rhythm-${sectionId}`);
+  if (rhythmSel) rhythmSel.value = currentRhythmSelection[sectionId];
   updateAll();
 }
 
